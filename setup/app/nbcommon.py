@@ -38,6 +38,7 @@ USAGE_FILE = os.path.join(STATE_DIR, "usage.json")
 REAL_CONFIG = os.path.join(STATE_DIR, "config.yaml")
 SCREENS_DIR = os.path.join(STATE_DIR, "screens")
 STATUS_FILE = os.path.join(RUN_DIR, "nostalgiabox-tv-status.json")
+REMOTE_FIFO = os.path.join(RUN_DIR, "nostalgiabox-remote.fifo")
 BASE_FILE = os.path.join(ETC_DIR, "base-command.json")
 
 MAX_CHANNELS = 30
@@ -281,6 +282,45 @@ def save_settings(s: dict) -> None:
     atomic_write(SETTINGS_FILE, json.dumps(s, indent=1))
 
 
+# The on-screen remote. The page names a button; the controller types the matching key
+# into NostalgiaBox's own keyboard input (the same keys a USB remote sends).
+REMOTE_KEYS = {
+    "channel_up": "\x1b[A", "channel_down": "\x1b[B",
+    "volume_up": "+", "volume_down": "-", "mute": "m",
+    "enter": "\r", "info": "i", "last": "l", "power": "p",
+    **{f"digit_{d}": str(d) for d in range(10)},
+}
+
+
+def type_keys(fd: int, keys: str) -> None:
+    """Type keys into NostalgiaBox's terminal input. An arrow key (escape sequence) is sent a
+    byte at a time with tiny gaps: NostalgiaBox's terminal reader decides 'arrow key' versus
+    'Esc = quit' by whether the next bytes arrive separately a moment later."""
+    if keys.startswith("\x1b"):
+        for ch in keys:
+            os.write(fd, ch.encode())
+            time.sleep(0.006)
+    else:
+        os.write(fd, keys.encode())
+
+
+def send_remote(key: str) -> bool:
+    """Queue one remote button press for the controller. False if the TV program isn't listening."""
+    if key not in REMOTE_KEYS:
+        raise ValueError("Unknown button.")
+    try:
+        fd = os.open(REMOTE_FIFO, os.O_WRONLY | os.O_NONBLOCK)
+    except OSError:
+        return False
+    try:
+        os.write(fd, (key + "\n").encode())
+        return True
+    except OSError:
+        return False
+    finally:
+        os.close(fd)
+
+
 def signal_controller() -> None:
     """Tell the TV controller to restart NostalgiaBox with the newest settings."""
     atomic_write(CONTROL_FILE, json.dumps({"seq": time.time_ns()}))
@@ -389,6 +429,8 @@ def _common_config(s: dict) -> dict:
         "volume_step": snd["volume_step"],
         "video_extensions": list(VIDEO_EXTS),
         "scan_recursive": True,
+        # Lets the on-screen remote press keys (the USB remote and the TV remote keep working).
+        "input": {"stdin": True},
     }
     dev = _audio_device(s)
     if dev:

@@ -54,6 +54,15 @@ input[type=color]{width:56px;height:44px;border:1px solid var(--line);border-rad
 .btn:hover{background:rgba(77,255,90,.08)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.primary:hover{filter:brightness(1.08)}
+
+.remote{max-width:340px;margin:0 auto}
+.remote .rgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
+.rbtn{font:700 1rem var(--sans);min-height:56px;border-radius:12px;border:1px solid var(--accent-dim);background:transparent;color:var(--accent);cursor:pointer;touch-action:manipulation;user-select:none}
+.rbtn:active{background:rgba(77,255,90,.18)}
+.rbtn:disabled{opacity:.35;cursor:default}
+.rbtn.small{font-size:.85rem}
+#remotebox>summary{cursor:pointer;list-style:none;min-height:32px}#remotebox>summary::-webkit-details-marker{display:none}#remotebox>summary::after{content:" ▾";color:var(--muted)}#remotebox[open]>summary::after{content:" ▴"}
+.rbtn.pw{color:var(--danger);border-color:#6d2a25}
 .btn.danger{color:var(--danger);border-color:#6d2a25}
 .btn.small{min-height:36px;padding:0 12px;font-size:.85rem}
 .btn[disabled]{opacity:.5;cursor:default}
@@ -154,6 +163,34 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 <div class="banner" id="pwbanner" hidden>
   You're still using the starting password. <a href="#sec-security" id="pwlink">Change it now</a> so nobody else on your network can change the box.
 </div>
+
+<!-- ---------- Remote ---------- -->
+<section class="card" id="sec-remote">
+  <details id="remotebox">
+  <summary><h2 style="display:inline">Remote</h2></summary>
+  <p class="hint" id="remotehint">A remote for the TV, for when the real one is lost or the kids aren't listening.</p>
+  <div class="remote">
+    <div class="rgrid">
+      <button class="rbtn pw small" data-k="power" aria-label="Standby">⏻ STANDBY</button>
+      <button class="rbtn" data-k="channel_up" aria-label="Channel up">CH ▲</button>
+      <button class="rbtn small" data-k="mute" aria-label="Mute">MUTE</button>
+      <button class="rbtn" data-k="volume_down" aria-label="Volume down">VOL −</button>
+      <button class="rbtn" data-k="channel_down" aria-label="Channel down">CH ▼</button>
+      <button class="rbtn" data-k="volume_up" aria-label="Volume up">VOL +</button>
+      <button class="rbtn small" data-k="last" aria-label="Last channel">LAST</button>
+      <button class="rbtn small" data-k="info" aria-label="Show channel info">INFO</button>
+      <span></span>
+    </div>
+    <div class="rgrid">
+      <button class="rbtn" data-k="digit_1">1</button><button class="rbtn" data-k="digit_2">2</button><button class="rbtn" data-k="digit_3">3</button>
+      <button class="rbtn" data-k="digit_4">4</button><button class="rbtn" data-k="digit_5">5</button><button class="rbtn" data-k="digit_6">6</button>
+      <button class="rbtn" data-k="digit_7">7</button><button class="rbtn" data-k="digit_8">8</button><button class="rbtn" data-k="digit_9">9</button>
+      <span></span><button class="rbtn" data-k="digit_0">0</button><button class="rbtn small" data-k="enter">OK</button>
+    </div>
+    <p class="msg" id="remotemsg" role="status"></p>
+  </div>
+  </details>
+</section>
 
 <!-- ---------- Channels ---------- -->
 <section class="card" id="sec-channels">
@@ -394,6 +431,7 @@ async function boot() {
   dirty = false; passwords = {};
   buildStatic();
   renderAll();
+  updateRemote();
   refreshCounts();
   loadZones();
   $("#savemsg").className = ""; $("#savemsg").textContent = S.configured ? "" : "Set up your channels, then tap Save & apply.";
@@ -813,6 +851,29 @@ async function sysAction(action, value, okText) {
   catch (e) { if (e.message !== "login") { m.className = "msg err"; m.textContent = e.message; } }
 }
 $("#tzset").addEventListener("click", () => sysAction("timezone", $("#tz").value, "Time zone changed."));
+
+// ---- on-screen remote
+try { if (localStorage.getItem("nb-remote-open") === "1") $("#remotebox").open = true; } catch (_) {}
+$("#remotebox").addEventListener("toggle", () => { try { localStorage.setItem("nb-remote-open", $("#remotebox").open ? "1" : "0"); } catch (_) {} });
+setInterval(async () => {
+  if ($("#app").hidden || document.hidden) return;
+  try { const d = await api("/api/state"); ST = d.status; updateRemote(); } catch (_) {}
+}, 10000);
+function updateRemote() {
+  const mode = ST && ST.tv_mode;
+  const on = mode === "tv";
+  document.querySelectorAll(".rbtn").forEach(b => { b.disabled = !on; });
+  const h = $("#remotehint");
+  if (h) h.textContent = on ? "A remote for the TV, for when the real one is lost or the kids aren't listening."
+    : mode === "offair" ? "The TV is off the air for today (screen-time limit), so the remote is paused."
+    : mode === "ready" ? "The TV is showing the setup screen. Add shows and Save & apply to use the remote."
+    : "The TV program isn't reporting in right now.";
+}
+document.querySelectorAll(".rbtn").forEach(b => b.addEventListener("click", async () => {
+  const m = $("#remotemsg"); m.textContent = "";
+  try { await api("/api/remote", { method: "POST", json: { key: b.dataset.k } }); }
+  catch (e) { if (e.message !== "login") { m.className = "msg err"; m.textContent = e.message; } }
+}));
 $("#restarttv").addEventListener("click", () => sysAction("restart-tv", null, "Restarting the picture…"));
 $("#reboot").addEventListener("click", () => { if (confirm("Reboot the box now?")) sysAction("reboot", null, "Rebooting. This page will work again in about a minute."); });
 $("#shutdown").addEventListener("click", () => { if (confirm("Shut the box down? You'll need to unplug and replug it to turn it back on.")) sysAction("shutdown", null, "Shutting down. It's safe to unplug when the green light stops blinking."); });
