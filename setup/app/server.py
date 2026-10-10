@@ -411,6 +411,18 @@ def h_system(h):
     h.send_json({"ok": True})
 
 
+def h_remote(h):
+    b = h.read_json()
+    key = str(b.get("key", ""))
+    try:
+        delivered = nb.send_remote(key)
+    except ValueError:
+        raise ApiError("Unknown button.")
+    if not delivered:
+        raise ApiError("The TV program isn't running right now.", 503)
+    h.send_json({"ok": True})
+
+
 def h_logout(h):
     tok = h.token()
     with _lock:
@@ -431,6 +443,7 @@ ROUTES = {
     ("POST", "/api/net/disconnect"): h_net_disconnect,
     ("GET", "/api/timezones"): h_timezones,
     ("POST", "/api/system"): h_system,
+    ("POST", "/api/remote"): h_remote,
     ("POST", "/api/logout"): h_logout,
 }
 

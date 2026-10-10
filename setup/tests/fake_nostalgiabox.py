@@ -15,5 +15,15 @@ mark = os.environ.get("NB_FAKE_MARK")
 if mark:
     with open(mark, "a") as f:
         f.write(cfg_path + "\n")
-while True:
-    time.sleep(1)
+keys = os.environ.get("NB_FAKE_KEYS")
+if keys and os.isatty(0):
+    import select, tty
+    tty.setcbreak(0)
+    while True:
+        if select.select([0], [], [], 0.5)[0]:
+            data = os.read(0, 64)
+            with open(keys, "a") as f:
+                f.write(repr(data.decode()) + "\n")
+else:
+    while True:
+        time.sleep(1)

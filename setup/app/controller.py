@@ -18,11 +18,13 @@ from __future__ import annotations
 
 import json
 import os
+import pty
 import signal
 import subprocess
 import sys
 import threading
 import time
+import tty
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nbcommon as nb  # noqa: E402
@@ -105,6 +107,7 @@ class Controller:
         self.mode_started = time.time()
         self.watcher = VideoWatcher()
         self.last_mount_try = 0.0
+        self.remote_fd: int | None = None  # our end of the pty NostalgiaBox reads keys from
 
     # ----------------------------------------------------------- preparing
     def prepare(self, mode: str, s: dict) -> str:
@@ -152,7 +155,45 @@ class Controller:
         else:
             argv, cwd, env = inv
         log(f"starting ({self.mode}): {' '.join(argv)}")
-        self.child = subprocess.Popen(argv, cwd=cwd, env=env)
+        # NostalgiaBox reads keystrokes from a terminal on stdin (input.stdin in the config).
+        # Giving it a private one lets the setup page's on-screen remote press keys.
+        master, slave = pty.openpty()
+        try:
+            tty.setcbreak(slave)
+            self.child = subprocess.Popen(argv, cwd=cwd, env=env, stdin=slave)
+        finally:
+            os.close(slave)
+        self.remote_fd = master
+
+    def press(self, key: str) -> None:
+        keys = nb.REMOTE_KEYS.get(key)
+        if keys and self.remote_fd is not None and self.child and self.child.poll() is None:
+            try:
+                nb.type_keys(self.remote_fd, keys)
+            except OSError:
+                pass
+
+    def remote_loop(self) -> None:
+        """Turns button names sent by the setup page into key presses for NostalgiaBox."""
+        try:
+            if os.path.exists(nb.REMOTE_FIFO):
+                os.unlink(nb.REMOTE_FIFO)
+            os.mkfifo(nb.REMOTE_FIFO, 0o600)
+            fd = os.open(nb.REMOTE_FIFO, os.O_RDWR)  # read+write so it never sees end-of-file
+        except OSError as e:
+            log(f"on-screen remote unavailable: {e!r}")
+            return
+        buf = b""
+        while True:
+            try:
+                chunk = os.read(fd, 256)
+            except OSError:
+                return
+            buf += chunk
+            *lines, buf = buf.split(b"\n")
+            buf = buf[-64:]
+            for line in lines:
+                self.press(line.decode("ascii", "ignore").strip())
 
     def stop_child(self) -> None:
         c = self.child
@@ -203,6 +244,7 @@ class Controller:
 
         s = nb.load_settings()
         self.watcher.start()
+        threading.Thread(target=self.remote_loop, daemon=True).start()
         self.watcher.checked.wait(timeout=12)
         reset = s["screentime"]["reset_hour"]
         day = nb.budget_day(None, reset)

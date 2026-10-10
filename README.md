@@ -26,6 +26,7 @@ that makes it friendly for a family: **install once, then do everything from you
   - **Network folder.** Point a channel at a share on your Unraid / NAS / Windows PC (**SMB or NFS**) and pick the folder with a built-in browser. Read-only: the box can never change your server.
 - **Everything on one page.** Playback, sound output, the CRT look, daily screen time, the page password, time zone, restart, reboot and shut down.
 - **"Box is ready" on the TV.** After install the TV shows the address and login, and tells you to log in and change the password.
+- **An on-screen remote.** For when the real remote is lost or the kids aren't listening: channel up/down, volume, mute, number pad, OK, info, last channel and standby, right on the page.
 - **Daily screen-time limit.** After N hours the TV goes to "OFF THE AIR" static until the next day. Survives unplugging.
 - **Works with your Plex library.** Point at the same folders Plex reads. No Plex token needed.
 - **Nothing about the TV changes.** Shows still play through NostalgiaBox itself (banner, CRT curve, the remote).
@@ -92,6 +93,15 @@ recovers by itself. Use *Skip some episodes* to hide seasons (`6-25`) or names (
 > **Using Plex?** The box reads the same files Plex does. On Unraid, turn on SMB (or NFS) export for
 > the share. The page doesn't talk to Plex itself.
 
+## 🎮 The on-screen remote
+
+Open the **Remote** card at the top of the page (tap it to expand). It presses the same keys your
+Flirc remote sends: **CH ▲/▼**, **VOL −/+**, **MUTE**, **LAST**, **INFO**, **STANDBY** (blank screen) and the number
+pad with **OK** for typing a channel number. It works while the TV is showing channels; it pauses
+on the "box is ready" screen and during "OFF THE AIR". The real remote and the TV's own remote keep working.
+
+It can't quit NostalgiaBox, and it needs the same login as the rest of the page.
+
 ## ⏱ Daily screen time
 
 Turn on **Limit how long the TV can play each day**, choose the hours and when a new day starts. Time
@@ -103,6 +113,7 @@ at the bottom of the page first so "midnight" is your midnight.
 | To do this | Do this |
 |---|---|
 | Add shows | Open the page, go to the channel's tab, upload or add to the network folder, then Save & apply |
+| Use the remote from your phone | *Remote* card at the top of the page |
 | Change the password | *Password* section |
 | Restart the picture | *This box*, *Restart the TV picture* |
 | Turn it off safely | *Shut down* on the page, or the remote's volume-down at 0 |
@@ -129,6 +140,7 @@ at the bottom of the page first so "midnight" is your midnight.
 - **Depends on NostalgiaBox.** It needs NostalgiaBox's `--config` option and its
   `nostalgiabox.service`. The installer reads that service to learn how NostalgiaBox starts. If
   upstream changes those, this may need an update.
+- **The on-screen remote** gives NostalgiaBox a private terminal for keyboard input (`input.stdin`). Verified against its real key-reading code, but not on a real Pi with a TV yet.
 - **Channels come from this page, not folder discovery.** The page writes an explicit channel list,
   so NostalgiaBox's automatic "one folder = one channel" and USB-drive detection are not used.
 - **Don't use NostalgiaBox's read-only SD "overlay" mode** with this. It would forget settings, uploads
@@ -155,7 +167,8 @@ at the bottom of the page first so "midnight" is your midnight.
 ```bash
 python3 setup/tests/test_units.py  # settings, helper input checks, config generation
 python3 setup/tests/e2e.py            # the page in a real browser (needs Playwright)
-python3 setup/tests/test_controller.py   # TV mode switching, with a stand-in for NostalgiaBox
+python3 setup/tests/test_controller.py   # TV mode switching and remote key presses, with a stand-in for NostalgiaBox
+.venv/bin/python setup/tests/test_remote_keys.py   # remote buttons through NostalgiaBox's real key reader (run from the NostalgiaBox folder)
 ```
 
 ## 🤝 Contributing

@@ -16,7 +16,7 @@ TMP = tempfile.mkdtemp(prefix="nbctl-")
 ENV = dict(os.environ, NB_STATE_DIR=TMP + "/state", NB_ETC_DIR=TMP + "/etc", NB_MEDIA_DIR=TMP + "/media",
            NB_MOUNT_DIR=TMP + "/mnt", NB_RUN_DIR=TMP + "/run", NB_TICK="0.2", NB_WATCH="0.5",
            NB_HELPER=f"{sys.executable} {ROOT}/tests/fake_helper.py", NB_FAKE_LOG=TMP + "/h.log",
-           NB_FAKE_MARK=TMP + "/marks.txt")
+           NB_FAKE_MARK=TMP + "/marks.txt", NB_FAKE_KEYS=TMP + "/keys.txt")
 for d in ("etc", "run", "state", "media/channel-1"):
     os.makedirs(f"{TMP}/{d}", exist_ok=True)
 json.dump({"argv": [sys.executable, ROOT + "/tests/fake_nostalgiabox.py"], "cwd": None, "env": {}},
@@ -85,6 +85,25 @@ try:
     good = [c["number"] for c in cfg["channels"]] == [2]
     ok &= good
     print(("  ok   " if good else "  FAIL ") + "channels config written from the saved settings")
+
+    # the on-screen remote: button names go in, the right keystrokes reach NostalgiaBox's terminal input
+    end = time.time() + 20
+    while time.time() < end and (nb.read_json(nb.STATUS_FILE, {}) or {}).get("mode") != "tv":
+        time.sleep(0.3)
+    time.sleep(1.0)  # let the fake program reach its input loop
+    sent = [nb.send_remote(k) for k in ("channel_up", "volume_down", "digit_7", "enter")]
+    time.sleep(1.5)
+    import ast
+    got = "".join(ast.literal_eval(x) for x in open(TMP + "/keys.txt").read().split("\n") if x) if os.path.exists(TMP + "/keys.txt") else ""
+    good = all(sent) and got.replace("\n", "\r") == "\x1b[A-7\r"
+    ok &= good
+    print(("  ok   " if good else "  FAIL ") + f"remote buttons reach NostalgiaBox as key presses ({got!r})")
+    try:
+        nb.send_remote("rm -rf")
+        print("  FAIL unknown remote button accepted")
+        ok = False
+    except ValueError:
+        print("  ok   unknown remote button refused")
 
     # stop the controller first so it can't overwrite the usage file we set up (it saves its own count on exit)
     procs["p"].terminate()
