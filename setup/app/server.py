@@ -120,7 +120,7 @@ def status_info(s: dict) -> dict:
         "used_seconds": st.get("used_seconds") if fresh else None,
         "budget_seconds": st.get("budget_seconds") if fresh else None,
         "ip": nb.local_ip(), "hostname": nb.short_hostname(), "port": nb.PORT,
-        "free_bytes": free, "total_bytes": total,
+        "free_bytes": free, "total_bytes": total, "on_drive": os.path.ismount(nb.MEDIA_DIR),
         "default_password": nb.auth_is_default(), "username": nb.auth_username(),
         "can_check": nb.load_base() is not None, "version": VERSION,
     }
@@ -423,6 +423,50 @@ def h_remote(h):
     h.send_json({"ok": True})
 
 
+_storage_lock = threading.Lock()
+
+
+def h_storage(h):
+    res = nb.call_helper("list-disks", {}, timeout=30)
+    if not res.get("ok"):
+        raise ApiError(res.get("error") or "Couldn't look for drives.", 502)
+    h.send_json({"disks": res.get("disks", []), "storage": res.get("storage", {})})
+
+
+def h_storage_format(h):
+    b = h.read_json()
+    if b.get("confirm") != "ERASE":
+        raise ApiError("Type ERASE to confirm.")
+    device, size = b.get("device"), b.get("size")
+    if not isinstance(device, str) or not isinstance(size, int):
+        raise ApiError("Pick a drive first.")
+    if not _storage_lock.acquire(blocking=False):
+        raise ApiError("A drive is already being set up. Wait for it to finish.", 409)
+    try:
+        res = nb.call_helper("format-disk", {"device": device, "size": size, "confirm": "ERASE",
+                                             "copy_existing": bool(b.get("copy_existing"))}, timeout=8 * 3600)
+    finally:
+        _storage_lock.release()
+    if not res.get("ok"):
+        raise ApiError(res.get("error") or "That didn't work.", 502)
+    nb.signal_controller()
+    h.send_json({"ok": True, "copied": bool(res.get("copied"))})
+
+
+def h_storage_use_sd(h):
+    h.read_json()
+    if not _storage_lock.acquire(blocking=False):
+        raise ApiError("A drive is being set up. Wait for it to finish.", 409)
+    try:
+        res = nb.call_helper("use-sd", {}, timeout=120)
+    finally:
+        _storage_lock.release()
+    if not res.get("ok"):
+        raise ApiError(res.get("error") or "That didn't work.", 502)
+    nb.signal_controller()
+    h.send_json({"ok": True})
+
+
 def h_logout(h):
     tok = h.token()
     with _lock:
@@ -443,6 +487,9 @@ ROUTES = {
     ("POST", "/api/net/disconnect"): h_net_disconnect,
     ("GET", "/api/timezones"): h_timezones,
     ("POST", "/api/system"): h_system,
+    ("GET", "/api/storage"): h_storage,
+    ("POST", "/api/storage/format"): h_storage_format,
+    ("POST", "/api/storage/use-sd"): h_storage_use_sd,
     ("POST", "/api/remote"): h_remote,
     ("POST", "/api/logout"): h_logout,
 }

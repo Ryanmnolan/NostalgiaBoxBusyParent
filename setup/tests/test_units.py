@@ -227,7 +227,7 @@ class Helper(unittest.TestCase):
         with open(h.FSTAB, "w") as f:
             f.write("proc /proc proc defaults 0 0\nUUID=abc / ext4 defaults 0 1\n")
         self.calls, self.mounted = [], set()
-        h.run = lambda cmd, timeout=60: (self.calls.append(cmd), (self.rc(cmd), self.err))[1]
+        h.run = lambda cmd, timeout=60, input=None: (self.calls.append(cmd), (self.rc(cmd), self.err))[1]
         h.is_mounted = lambda p: p in self.mounted
         self.rc, self.err = (lambda cmd: 0), ""
 
@@ -347,6 +347,125 @@ class Helper(unittest.TestCase):
             sys.stdin, sys.stdout = sys.__stdin__, sys.__stdout__
         self.assertEqual(json.loads(out)["ok"], False)
         self.assertNotIn("Traceback", out)
+
+
+LSBLK = {"blockdevices": [
+    {"name": "mmcblk0", "path": "/dev/mmcblk0", "type": "disk", "size": 32000000000, "tran": None, "ro": False,
+     "children": [{"name": "mmcblk0p1", "path": "/dev/mmcblk0p1", "type": "part", "mountpoints": ["/boot/firmware"]},
+                  {"name": "mmcblk0p2", "path": "/dev/mmcblk0p2", "type": "part", "mountpoints": ["/"]}]},
+    {"name": "sda", "path": "/dev/sda", "type": "disk", "size": 2000000000000, "vendor": "WD      ", "model": "Elements 25A2",
+     "serial": "123", "tran": "usb", "ro": False,
+     "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "fstype": "exfat", "label": "OLD", "mountpoints": ["/media/old"]}]},
+    {"name": "sdb", "path": "/dev/sdb", "type": "disk", "size": 64000000000, "tran": "usb", "ro": False,
+     "children": [{"name": "sdb1", "path": "/dev/sdb1", "type": "part", "mountpoints": ["/"]}]},
+    {"name": "sdc", "path": "/dev/sdc", "type": "disk", "size": 8000000000, "tran": "usb", "ro": True},
+    {"name": "sdd", "path": "/dev/sdd", "type": "disk", "size": 500000000000, "tran": "sata", "ro": False},
+    {"name": "nvme0n1", "path": "/dev/nvme0n1", "type": "disk", "size": 500000000000, "tran": "nvme", "ro": False},
+]}
+UUID = "5f1b2c3d-1111-2222-3333-444455556666"
+
+
+class Storage(unittest.TestCase):
+    setUp = Helper.setUp
+
+    def prepare(self):
+        h = self.h
+        h.MEDIA = os.path.dirname(h.FSTAB) + "/media"
+        os.makedirs(h.MEDIA + "/channel-1")
+        open(h.MEDIA + "/channel-1/a.mp4", "w").write("x")
+        h.wait_for_path = lambda p, seconds=15: True
+        h.chown = lambda *a: None
+        h.os.chown  # untouched
+        def fake(cmd, timeout=60, input=None):
+            self.calls.append((cmd, input))
+            name = cmd[0]
+            if name == "lsblk":
+                return 0, json.dumps(LSBLK)
+            if name == "blkid":
+                return 0, UUID + "\n"
+            if name == "mkfs.ext4" and self.fail_mkfs:
+                return 1, "mke2fs: Input/output error"
+            if name == "mount" and len(cmd) == 2:
+                self.mounted.add(cmd[1])
+            if name == "mount" and len(cmd) == 3:
+                self.mounted.add(cmd[2])
+            return 0, ""
+        h.run = fake
+        self.fail_mkfs = False
+        self.mounted = {"/media/old"}
+        h.is_mounted = lambda p: p in self.mounted
+        h.umount = lambda p: self.mounted.discard(p)
+
+    def names(self):
+        return [c[0][0] if isinstance(c, tuple) else c[0] for c in self.calls]
+
+    def test_only_safe_usb_drives_are_listed(self):
+        self.prepare()
+        disks = self.h.read_disks()
+        self.assertEqual([d["path"] for d in disks], ["/dev/sda"])
+        self.assertEqual(disks[0]["name"], "WD Elements 25A2")
+        self.assertEqual(disks[0]["filesystems"], ["exfat"])
+
+    def test_refuses_dangerous_requests(self):
+        self.prepare()
+        h = self.h
+        good = {"device": "/dev/sda", "size": 2000000000000, "confirm": "ERASE"}
+        for bad in (dict(good, confirm="erase"), dict(good, confirm=""), dict(good, device="/dev/mmcblk0"),
+                    dict(good, device="/dev/sdb"), dict(good, device="/dev/sdc"), dict(good, device="/dev/sdd"),
+                    dict(good, device="/dev/sda1"), dict(good, device="../sda"), dict(good, device="/dev/sda; rm -rf /"),
+                    dict(good, size=1), dict(good, size="x"), {k: v for k, v in good.items() if k != "size"}):
+            self.calls.clear()
+            with self.assertRaises(h.Fail, msg=str(bad)):
+                h.cmd_format_disk(bad)
+            self.assertFalse(any(n in ("sfdisk", "mkfs.ext4", "wipefs") for n in self.names()), str(bad))
+
+    def test_format_happy_path_in_the_right_order(self):
+        self.prepare()
+        h = self.h
+        out = h.cmd_format_disk({"device": "/dev/sda", "size": 2000000000000, "confirm": "ERASE", "copy_existing": True})
+        self.assertEqual(out["uuid"], UUID)
+        self.assertTrue(out["copied"])
+        n = self.names()
+        self.assertEqual(n[n.index("systemctl")], "systemctl")
+        first_sys = self.calls[n.index("systemctl")][0]
+        self.assertEqual(first_sys[:3], ["systemctl", "stop", "nostalgiabox.service"])
+        for a, b in (("wipefs", "sfdisk"), ("sfdisk", "mkfs.ext4"), ("mkfs.ext4", "blkid"), ("blkid", "cp")):
+            self.assertLess(n.index(a), n.index(b), (a, b))
+        sf = [c for c in self.calls if c[0][0] == "sfdisk"][0]
+        self.assertIn("label: gpt", sf[1])
+        mk = [c for c in self.calls if c[0][0] == "mkfs.ext4"][0][0]
+        self.assertEqual(mk[-1], "/dev/sda1")
+        self.assertIn("NOSTALGIABOX", mk)
+        self.assertEqual(self.calls[-1][0][:3], ["systemctl", "start", "nostalgiabox.service"])  # TV always restarted
+        fstab = open(h.FSTAB).read()
+        self.assertIn(h.STORE_BEGIN, fstab)
+        self.assertIn(f"UUID={UUID} {h.MEDIA} ext4 defaults,noatime,nofail", fstab)
+        self.assertIn("proc /proc proc defaults 0 0", fstab)  # the rest of fstab untouched
+
+    def test_a_failure_leaves_fstab_alone_and_restarts_the_tv(self):
+        self.prepare()
+        h = self.h
+        self.fail_mkfs = True
+        with self.assertRaises(h.Fail) as cm:
+            h.cmd_format_disk({"device": "/dev/sda", "size": 2000000000000, "confirm": "ERASE"})
+        self.assertIn("Formatting the drive failed", str(cm.exception))
+        self.assertNotIn(h.STORE_BEGIN, open(h.FSTAB).read())
+        self.assertEqual(self.calls[-1][0][:3], ["systemctl", "start", "nostalgiabox.service"])
+        self.assertTrue(any(c[0][:3] == ["systemctl", "unmask", "--runtime"] or c[0][1:3] == ["unmask", "--runtime"] for c in self.calls))
+
+    def test_use_sd_removes_only_our_block_and_keeps_network_mounts(self):
+        self.prepare()
+        h = self.h
+        h.cmd_apply_mounts({"channels": [{"id": 1, "net": {"type": "nfs", "host": "10.0.0.5", "share": "/m", "username": ""}, "password": None}]})
+        h.cmd_format_disk({"device": "/dev/sda", "size": 2000000000000, "confirm": "ERASE"})
+        text = open(h.FSTAB).read()
+        self.assertIn(h.BEGIN, text); self.assertIn(h.STORE_BEGIN, text)
+        h.cmd_apply_mounts({"channels": []})  # saving channels must not drop the drive
+        self.assertIn(h.STORE_BEGIN, open(h.FSTAB).read())
+        h.cmd_use_sd({})
+        text = open(h.FSTAB).read()
+        self.assertNotIn(h.STORE_BEGIN, text)
+        self.assertIn("proc /proc proc defaults 0 0", text)
 
 
 if __name__ == "__main__":

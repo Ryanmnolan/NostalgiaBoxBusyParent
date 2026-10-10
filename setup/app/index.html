@@ -62,6 +62,11 @@ input[type=color]{width:56px;height:44px;border:1px solid var(--line);border-rad
 .rbtn:disabled{opacity:.35;cursor:default}
 .rbtn.small{font-size:.85rem}
 #remotebox>summary{cursor:pointer;list-style:none;min-height:32px}#remotebox>summary::-webkit-details-marker{display:none}#remotebox>summary::after{content:" ▾";color:var(--muted)}#remotebox[open]>summary::after{content:" ▴"}
+#fmtform{padding:16px}
+#fmtform .row{margin-top:12px}
+.drive{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.drive .hint{margin:2px 0 0}
+#fmtdlg label.check{display:flex;gap:10px;align-items:center;margin:10px 0}
 .rbtn.pw{color:var(--danger);border-color:#6d2a25}
 .btn.danger{color:var(--danger);border-color:#6d2a25}
 .btn.small{min-height:36px;padding:0 12px;font-size:.85rem}
@@ -205,6 +210,33 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
   <div class="tabs" id="tabs" role="tablist" aria-label="Channels"></div>
   <div class="panel" id="panel" role="tabpanel"></div>
 </section>
+
+<!-- ---------- Storage ---------- -->
+<section class="card" id="sec-storage">
+  <h2>Storage</h2>
+  <p class="hint" id="storagehint">Where uploaded shows are kept. A USB drive holds far more than the SD card, and keeps the card from wearing out.</p>
+  <p class="status" id="storagenow"></p>
+  <div id="drives"></div>
+  <div class="row">
+    <button class="btn" id="drivescan">Look for drives</button>
+    <button class="btn" id="usesd" hidden>Use the SD card again</button>
+  </div>
+  <p class="msg" id="storagemsg" role="status"></p>
+</section>
+<dialog id="fmtdlg">
+  <form method="dialog" id="fmtform">
+    <h2 style="color:var(--danger)">Erase this drive?</h2>
+    <p id="fmtwhat"></p>
+    <p><b>Everything on it will be erased and can't be brought back.</b> It becomes the box's show storage.</p>
+    <label class="check"><input type="checkbox" id="fmtcopy" checked> Copy the shows already on the SD card onto it</label>
+    <label class="field"><span>Type ERASE to continue</span><input id="fmtconfirm" autocomplete="off" autocapitalize="characters"></label>
+    <div class="row">
+      <button class="btn" value="cancel" id="fmtcancel" type="button">Cancel</button>
+      <button class="btn danger" id="fmtgo" type="button" disabled>Erase and set up</button>
+    </div>
+    <p class="msg" id="fmtmsg" role="status"></p>
+  </form>
+</dialog>
 
 <!-- ---------- Playback ---------- -->
 <section class="card" id="sec-playback">
@@ -432,6 +464,7 @@ async function boot() {
   buildStatic();
   renderAll();
   updateRemote();
+  scanDrives();
   refreshCounts();
   loadZones();
   $("#savemsg").className = ""; $("#savemsg").textContent = S.configured ? "" : "Set up your channels, then tap Save & apply.";
@@ -852,6 +885,61 @@ async function sysAction(action, value, okText) {
 }
 $("#tzset").addEventListener("click", () => sysAction("timezone", $("#tz").value, "Time zone changed."));
 
+
+// ---- storage drive
+let DRIVES = [];
+const fmtSize = b => b >= 1e12 ? (b / 1e12).toFixed(1) + " TB" : (b / 1e9).toFixed(b >= 1e11 ? 0 : 1) + " GB";
+function renderStorage(state) {
+  const onDrive = state && state.kind === "drive";
+  $("#storagenow").className = "status ok";
+  $("#storagenow").textContent = onDrive
+    ? (state.mounted ? "✓ Shows are stored on a USB drive." : "⚠ Set up to use a USB drive, but it isn't plugged in. Plug it in and restart the box.")
+    : "Shows are stored on the SD card.";
+  $("#usesd").hidden = !onDrive;
+  const box = $("#drives"); box.innerHTML = "";
+  if (!DRIVES.length) { box.innerHTML = '<p class="hint">No USB drive found. Plug one in, wait a few seconds, then tap Look for drives.</p>'; return; }
+  DRIVES.forEach(d => {
+    const row = document.createElement("div"); row.className = "drive";
+    const what = d.is_storage ? "Currently used for shows"
+      : d.filesystems.length ? "Has data (" + d.filesystems.join(", ") + (d.labels.length ? ": " + d.labels.join(", ") : "") + ")" : "Empty or not formatted";
+    row.innerHTML = `<div><b></b><div class="hint"></div></div><button class="btn danger">${d.is_storage ? "Erase and redo" : "Erase and use…"}</button>`;
+    row.querySelector("b").textContent = d.name + " · " + fmtSize(d.size);
+    row.querySelector(".hint").textContent = what;
+    row.querySelector("button").addEventListener("click", () => openFormat(d));
+    box.appendChild(row);
+  });
+}
+async function scanDrives(keepMsg) {
+  if (keepMsg !== true) $("#storagemsg").textContent = "";
+  try { const d = await api("/api/storage"); DRIVES = d.disks; renderStorage(d.storage); }
+  catch (e) { if (e.message !== "login") { $("#storagemsg").className = "msg err"; $("#storagemsg").textContent = e.message; } }
+}
+let fmtTarget = null;
+function openFormat(d) {
+  fmtTarget = d; $("#fmtconfirm").value = ""; $("#fmtgo").disabled = true; $("#fmtmsg").textContent = "";
+  $("#fmtwhat").textContent = d.name + " · " + fmtSize(d.size) + (d.filesystems.length ? " (currently has files on it)" : "");
+  $("#fmtdlg").showModal();
+}
+$("#fmtconfirm").addEventListener("input", () => { $("#fmtgo").disabled = $("#fmtconfirm").value.trim() !== "ERASE"; });
+$("#fmtcancel").addEventListener("click", () => $("#fmtdlg").close());
+$("#fmtgo").addEventListener("click", async () => {
+  const go = $("#fmtgo"), m = $("#fmtmsg"); go.disabled = true; $("#fmtcancel").disabled = true;
+  m.className = "msg"; m.textContent = "Setting up the drive… this can take several minutes. Keep it plugged in and don't close this page.";
+  try {
+    const r = await api("/api/storage/format", { method: "POST", json: { device: fmtTarget.path, size: fmtTarget.size, confirm: "ERASE", copy_existing: $("#fmtcopy").checked } });
+    $("#fmtdlg").close();
+    $("#storagemsg").className = "msg ok";
+    $("#storagemsg").textContent = "Done. The drive is ready" + (r.copied ? " and your existing shows were copied over." : ".");
+    await scanDrives(true); refreshCounts();
+  } catch (e) { if (e.message !== "login") { m.className = "msg err"; m.textContent = e.message; } }
+  finally { $("#fmtcancel").disabled = false; go.disabled = $("#fmtconfirm").value.trim() !== "ERASE"; }
+});
+$("#drivescan").addEventListener("click", () => scanDrives());
+$("#usesd").addEventListener("click", async () => {
+  if (!confirm("Go back to storing shows on the SD card? Shows on the USB drive stay on the drive but won't play.")) return;
+  try { await api("/api/storage/use-sd", { method: "POST", json: {} }); $("#storagemsg").className = "msg ok"; $("#storagemsg").textContent = "Back on the SD card."; await scanDrives(true); refreshCounts(); }
+  catch (e) { if (e.message !== "login") { $("#storagemsg").className = "msg err"; $("#storagemsg").textContent = e.message; } }
+});
 // ---- on-screen remote
 try { if (localStorage.getItem("nb-remote-open") === "1") $("#remotebox").open = true; } catch (_) {}
 $("#remotebox").addEventListener("toggle", () => { try { localStorage.setItem("nb-remote-open", $("#remotebox").open ? "1" : "0"); } catch (_) {} });
