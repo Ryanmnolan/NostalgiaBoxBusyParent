@@ -11,6 +11,9 @@ Commands:
   browse-umount  unmount that temporary share
   apply-mounts   make /etc/fstab + the mounts match the channels saved on the page
   ensure-mounts  (re)mount any saved share that is not mounted right now
+  list-disks     list USB drives that could be used for shows, and where shows are stored now
+  format-disk    erase a USB drive and set it up as the box's show storage (asks for ERASE)
+  use-sd         go back to storing shows on the SD card
   power          reboot | poweroff
   set-timezone   change the time zone
 
@@ -21,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 ETC = "/etc/nostalgiabox-setup"
 CREDS = ETC + "/creds"
@@ -31,6 +35,13 @@ FSTAB = "/etc/fstab"
 BEGIN = "# >>> nostalgiabox-setup (managed automatically, do not edit) >>>"
 END = "# <<< nostalgiabox-setup <<<"
 MAX_CHANNELS = 30
+MEDIA = "/media/nostalgiabox"
+STORE_BEGIN = "# >>> nostalgiabox-setup storage drive (managed automatically, do not edit) >>>"
+STORE_END = "# <<< nostalgiabox-setup storage drive <<<"
+DISK_LABEL = "NOSTALGIABOX"
+TV_UNIT = "nostalgiabox.service"
+USB_UNIT = "nostalgiabox-usb.service"
+DISK_RE = re.compile(r"^/dev/sd[a-z]{1,2}$")
 
 HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
 SMB_SHARE_RE = re.compile(r"^[\w][\w .-]{0,79}$")
@@ -43,10 +54,10 @@ class Fail(Exception):
 
 
 # ------------------------------------------------------------------ plumbing
-def run(cmd, timeout=60):
+def run(cmd, timeout=60, input=None):
     """Run a command, return (returncode, combined output). Replaced in tests."""
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, input=input)
         return r.returncode, (r.stdout + r.stderr).strip()
     except subprocess.TimeoutExpired:
         return 124, "timed out"
@@ -218,13 +229,13 @@ def cmd_browse_umount(req):
     return {}
 
 
-def parse_block(text):
+def parse_block(text, begin=BEGIN, end=END):
     """Mount points listed in our block of /etc/fstab."""
     inside, found = False, []
     for line in text.splitlines():
-        if line.strip() == BEGIN:
+        if line.strip() == begin:
             inside = True
-        elif line.strip() == END:
+        elif line.strip() == end:
             inside = False
         elif inside and line.strip() and not line.startswith("#"):
             parts = line.split()
@@ -233,13 +244,13 @@ def parse_block(text):
     return found
 
 
-def replace_block(text, block_lines):
+def replace_block(text, block_lines, begin=BEGIN, end=END):
     out, skipping = [], False
     for line in text.splitlines():
-        if line.strip() == BEGIN:
+        if line.strip() == begin:
             skipping = True
             continue
-        if line.strip() == END:
+        if line.strip() == end:
             skipping = False
             continue
         if not skipping:
@@ -247,7 +258,7 @@ def replace_block(text, block_lines):
     while out and not out[-1].strip():
         out.pop()
     if block_lines:
-        out += ["", BEGIN] + block_lines + [END]
+        out += ["", begin] + block_lines + [end]
     return "\n".join(out) + "\n"
 
 
@@ -345,6 +356,190 @@ def cmd_ensure_mounts(req):
     return {"results": results}
 
 
+
+# ------------------------------------------------------------ storage drive
+LSBLK_COLUMNS = "NAME,PATH,TYPE,SIZE,VENDOR,MODEL,SERIAL,TRAN,RO,FSTYPE,LABEL,UUID,MOUNTPOINTS"
+
+
+def _mounts_of(node):
+    mps = node.get("mountpoints")
+    if mps is None:
+        mps = [node.get("mountpoint")]
+    return [m for m in mps if m]
+
+
+def _walk(node):
+    yield node
+    for c in node.get("children") or []:
+        yield from _walk(c)
+
+
+def read_disks():
+    """USB disks that are safe candidates. Never the SD card / boot disk, never read-only ones."""
+    rc, out = run(["lsblk", "-J", "-b", "-o", LSBLK_COLUMNS], 20)
+    if rc != 0:
+        raise Fail("Couldn't look for drives (lsblk failed).")
+    try:
+        devices = json.loads(out).get("blockdevices", [])
+    except ValueError:
+        raise Fail("Couldn't read the list of drives.")
+    disks = []
+    for d in devices:
+        path = d.get("path") or ("/dev/" + str(d.get("name")))
+        if d.get("type") != "disk" or not DISK_RE.match(path):
+            continue
+        if (d.get("tran") or "").lower() != "usb" or str(d.get("ro")) in ("1", "True", "true"):
+            continue
+        nodes = list(_walk(d))
+        mounts = [m for n in nodes for m in _mounts_of(n)]
+        if any(m == "/" or m.startswith("/boot") or m.startswith("/usr") or m.startswith("/var") for m in mounts):
+            continue  # never touch the disk the system runs from
+        parts = [n for n in nodes if n is not d]
+        name = " ".join(x for x in ((d.get("vendor") or "").strip(), (d.get("model") or "").strip()) if x) or "USB drive"
+        disks.append({
+            "path": path,
+            "name": name,
+            "size": int(d.get("size") or 0),
+            "serial": d.get("serial") or "",
+            "labels": [n["label"] for n in parts if n.get("label")],
+            "filesystems": sorted({n["fstype"] for n in parts if n.get("fstype")}),
+            "mounts": mounts,
+            "partitions": [n.get("path") or "/dev/" + str(n.get("name")) for n in parts],
+            "is_storage": any(n.get("label") == DISK_LABEL and MEDIA in _mounts_of(n) for n in parts),
+        })
+    return disks
+
+
+def storage_state():
+    try:
+        with open(FSTAB) as f:
+            text = f.read()
+    except OSError:
+        text = ""
+    configured = bool(parse_block(text, STORE_BEGIN, STORE_END))
+    return {"kind": "drive" if configured else "sd", "mounted": is_mounted(MEDIA)}
+
+
+def cmd_list_disks(req):
+    return {"disks": read_disks(), "storage": storage_state()}
+
+
+def wait_for_path(path, seconds=15):
+    for _ in range(int(seconds * 2)):
+        if os.path.exists(path):
+            return True
+        time.sleep(0.5)
+    return os.path.exists(path)
+
+
+chown = os.chown
+
+
+def systemctl(action, unit):
+    run(["systemctl", action, unit], 60)
+
+
+def step(cmd, what, timeout=120, input=None):
+    rc, out = run(cmd, timeout, input)
+    if rc != 0:
+        raise Fail(f"{what} failed. " + (out.strip().splitlines()[-1][:200] if out.strip() else ""))
+    return out
+
+
+def set_store_block(lines):
+    try:
+        with open(FSTAB) as f:
+            old = f.read()
+    except OSError:
+        old = ""
+    write_fstab(replace_block(old, lines, STORE_BEGIN, STORE_END))
+    run(["systemctl", "daemon-reload"], 30)
+
+
+def cmd_format_disk(req):
+    if req.get("confirm") != "ERASE":
+        raise Fail("Type ERASE to confirm.")
+    dev = str(req.get("device", ""))
+    if not DISK_RE.match(dev):
+        raise Fail("That isn't a USB drive this box will format.")
+    match = [d for d in read_disks() if d["path"] == dev]
+    if not match:
+        raise Fail("That drive isn't there any more, or isn't a USB drive. Look again and retry.")
+    disk = match[0]
+    try:
+        size_seen = int(req.get("size"))
+    except (TypeError, ValueError):
+        size_seen = -1
+    if size_seen != disk["size"]:
+        raise Fail("The drive changed since you looked. Look again and retry.")
+    uid, gid = app_ids()
+    copy_existing = bool(req.get("copy_existing"))
+
+    part = dev + "1"
+    tmp = MOUNT_ROOT + "/.newdrive"
+    copied = False
+    systemctl("stop", TV_UNIT)  # nothing may be playing from the old storage
+    run(["systemctl", "mask", "--runtime", USB_UNIT], 20)  # keep the hot-plug mounter out of the way
+    try:
+        was_ours = disk["is_storage"]
+        if was_ours:
+            set_store_block([])
+        for mp in sorted(set(disk["mounts"]), reverse=True):
+            if mp == "/" or mp.startswith("/boot"):
+                raise Fail("Refusing: that drive holds part of the system.")
+            umount(mp)
+        if was_ours:
+            umount(MEDIA)
+        for p in disk["partitions"]:
+            run(["wipefs", "-a", p], 30)
+        step(["wipefs", "-a", dev], "Clearing the old drive contents", 60)
+        step(["sfdisk", "--wipe", "always", "--wipe-partitions", "always", dev], "Partitioning the drive", 60,
+             input="label: gpt\n,,L\n")
+        run(["blockdev", "--rereadpt", dev], 20)
+        run(["udevadm", "settle", "--timeout=20"], 30)
+        if not wait_for_path(part):
+            raise Fail("The new partition never appeared. Unplug the drive, plug it back in and try again.")
+        step(["mkfs.ext4", "-F", "-m", "0", "-L", DISK_LABEL, part], "Formatting the drive", 1800)
+        uuid = step(["blkid", "-o", "value", "-s", "UUID", part], "Reading the new drive's ID", 30).strip()
+        if not re.fullmatch(r"[0-9a-fA-F-]{8,40}", uuid):
+            raise Fail("Couldn't read the new drive's ID.")
+
+        os.makedirs(tmp, exist_ok=True)
+        step(["mount", part, tmp], "Mounting the new drive", 60)
+        try:
+            if copy_existing and os.path.isdir(MEDIA) and not is_mounted(MEDIA) and os.listdir(MEDIA):
+                step(["cp", "-a", MEDIA + "/.", tmp + "/"], "Copying the shows already on the SD card", 6 * 3600)
+                copied = True
+            chown(tmp, uid, gid)  # after the copy, which would otherwise carry over the old folder's owner
+            os.chmod(tmp, 0o775)
+        finally:
+            umount(tmp)
+
+        set_store_block([f"UUID={uuid} {MEDIA} ext4 defaults,noatime,nofail,x-systemd.device-timeout=10 0 2"])
+        os.makedirs(MEDIA, exist_ok=True)
+        step(["mount", MEDIA], "Mounting the drive for the TV", 60)
+        if not is_mounted(MEDIA):
+            raise Fail("The drive didn't mount.")
+        chown(MEDIA, uid, gid)
+    finally:
+        run(["systemctl", "unmask", "--runtime", USB_UNIT], 20)
+        systemctl("start", TV_UNIT)
+    return {"uuid": uuid, "copied": copied}
+
+
+def cmd_use_sd(req):
+    systemctl("stop", TV_UNIT)
+    try:
+        set_store_block([])
+        if is_mounted(MEDIA):
+            umount(MEDIA)
+        if is_mounted(MEDIA):
+            raise Fail("Couldn't release the drive. Restart the TV picture and try again.")
+    finally:
+        systemctl("start", TV_UNIT)
+    return {}
+
+
 def cmd_power(req):
     action = req.get("action")
     if action not in ("reboot", "poweroff"):
@@ -371,6 +566,9 @@ COMMANDS = {
     "browse-umount": cmd_browse_umount,
     "apply-mounts": cmd_apply_mounts,
     "ensure-mounts": cmd_ensure_mounts,
+    "list-disks": cmd_list_disks,
+    "format-disk": cmd_format_disk,
+    "use-sd": cmd_use_sd,
     "power": cmd_power,
     "set-timezone": cmd_set_timezone,
 }

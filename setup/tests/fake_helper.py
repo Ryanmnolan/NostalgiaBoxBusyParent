@@ -25,6 +25,15 @@ if cmd == "browse-mount":
         touch(b + "/Kids TV/Dragon Tales/c.mkv")
         touch(b + "/Movies/d.mp4")
         touch(b + "/$RECYCLE.BIN/e.mp4")
+elif cmd == "list-disks":
+    out["disks"] = [{"path": "/dev/sda", "name": "WD Elements 25A2", "size": 2000000000000, "serial": "1", "labels": ["OLD"],
+                     "filesystems": ["exfat"], "mounts": [], "partitions": ["/dev/sda1"], "is_storage": False}]
+    out["storage"] = {"kind": "sd", "mounted": False}
+elif cmd == "format-disk":
+    if req.get("confirm") != "ERASE" or req.get("device") != "/dev/sda":
+        out = {"ok": False, "error": "refused"}
+    else:
+        out["copied"] = bool(req.get("copy_existing"))
 elif cmd == "apply-mounts":
     out["results"] = [{"id": c["id"], "mounted": True, "error": ""} for c in req.get("channels", [])]
 print(json.dumps(out))

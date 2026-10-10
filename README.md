@@ -27,6 +27,7 @@ that makes it friendly for a family: **install once, then do everything from you
 - **Everything on one page.** Playback, sound output, the CRT look, daily screen time, the page password, time zone, restart, reboot and shut down.
 - **"Box is ready" on the TV.** After install the TV shows the address and login, and tells you to log in and change the password.
 - **An on-screen remote.** For when the real remote is lost or the kids aren't listening: channel up/down, volume, mute, number pad, OK, info, last channel and standby, right on the page.
+- **Storage drive setup.** Plug in a USB drive and format it for your shows from the page. Safer for a box that gets unplugged, and far more room than the SD card.
 - **Daily screen-time limit.** After N hours the TV goes to "OFF THE AIR" static until the next day. Survives unplugging.
 - **Works with your Plex library.** Point at the same folders Plex reads. No Plex token needed.
 - **Nothing about the TV changes.** Shows still play through NostalgiaBox itself (banner, CRT curve, the remote).
@@ -93,6 +94,29 @@ recovers by itself. Use *Skip some episodes* to hide seasons (`6-25`) or names (
 > **Using Plex?** The box reads the same files Plex does. On Unraid, turn on SMB (or NFS) export for
 > the share. The page doesn't talk to Plex itself.
 
+## 🎬 A channel for movies
+
+A movie channel is just a channel whose folder holds movies:
+
+1. Pick a channel tab and name it **Movies**.
+2. Add the movies the same way as shows: **upload** them, or choose **Network folder** and point at your Movies share (for Plex users, the same Movies folder Plex reads). Folders like `Movie Name (2019)/Movie Name.mkv` are fine, since sub-folders are scanned.
+3. Under **Playback**, consider **pick up where you left off**. With the default ("start a random episode"), flipping to the channel starts a random movie a few seconds in. With "pick up where you left off", a movie resumes where you stopped. This setting applies to every channel, not just movies.
+4. To hide trailers and extras, open **Skip some episodes** and add names like `*trailer*`, `*sample*` or `*extras*`.
+5. Tap **Save & apply**.
+
+Movies play on endless shuffle like everything else, so when one ends the next one starts.
+
+## 💾 Using a USB drive for your shows
+
+Uploads normally go on the SD card. A USB drive holds far more and spares the card. In the **Storage** card:
+
+1. Plug the drive into the Pi, then tap **Look for drives**.
+2. Tap **Erase and use…** next to it, and type `ERASE` to confirm. **Everything on the drive is erased.**
+3. Leave **Copy the shows already on the SD card** ticked to bring over anything you've uploaded so far.
+4. Wait for "Done". It formats the drive as `ext4` (labelled `NOSTALGIABOX`) and uses it from then on, including after reboots.
+
+Good to know: the page only offers USB drives, never the SD card. If the drive isn't plugged in at boot, the box still starts (no shows until you plug it in). **Use the SD card again** switches back; shows on the drive stay on the drive. ext4 isn't readable by Windows or Mac directly; add shows through this page, or over the network.
+
 ## 🎮 The on-screen remote
 
 Open the **Remote** card at the top of the page (tap it to expand). It presses the same keys your
@@ -141,6 +165,7 @@ at the bottom of the page first so "midnight" is your midnight.
   `nostalgiabox.service`. The installer reads that service to learn how NostalgiaBox starts. If
   upstream changes those, this may need an update.
 - **The on-screen remote** gives NostalgiaBox a private terminal for keyboard input (`input.stdin`). Verified against its real key-reading code, but not on a real Pi with a TV yet.
+- **Formatting a drive is permanent** and not yet tried on a real Pi. The command sequence is tested with stand-ins and on a disk image, but please try it with an empty or disposable drive first.
 - **Channels come from this page, not folder discovery.** The page writes an explicit channel list,
   so NostalgiaBox's automatic "one folder = one channel" and USB-drive detection are not used.
 - **Don't use NostalgiaBox's read-only SD "overlay" mode** with this. It would forget settings, uploads
