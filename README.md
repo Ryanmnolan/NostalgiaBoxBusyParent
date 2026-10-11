@@ -142,7 +142,35 @@ at the bottom of the page first so "midnight" is your midnight.
 | Restart the picture | *This box*, *Restart the TV picture* |
 | Turn it off safely | *Shut down* on the page, or the remote's volume-down at 0 |
 | Update this project | `cd ~/NostalgiaBox && git pull && bash setup/install.sh` (settings and shows are kept) |
-| Remove it | `bash ~/NostalgiaBox/setup/install.sh --uninstall` (videos and settings stay) |
+| Remove it | `bash ~/NostalgiaBox/setup/install.sh --uninstall` (videos and settings stay). See [Uninstalling](#-uninstalling) |
+
+## 🗑 Uninstalling
+
+**Remove just the setup page** (NostalgiaBox keeps working from its own `config.yaml`):
+
+```bash
+bash ~/NostalgiaBox/setup/install.sh --uninstall
+```
+
+This removes the web page, its services, the network-folder mounts and the login. It **keeps** your
+videos (`/media/nostalgiabox`), your saved settings (`/var/lib/nostalgiabox-setup`) and any USB storage
+drive you set up, so installing again picks up where you left off. To delete the saved settings too:
+`sudo rm -rf /var/lib/nostalgiabox-setup`.
+
+**Remove NostalgiaBox as well:**
+
+```bash
+bash ~/NostalgiaBox/setup/install.sh --uninstall
+sudo systemctl disable --now nostalgiabox nostalgiabox-usb
+sudo rm -f /etc/systemd/system/nostalgiabox.service /etc/systemd/system/nostalgiabox-usb.service \
+  /etc/udev/rules.d/99-nostalgiabox-usb.rules /etc/sudoers.d/nostalgiabox-poweroff /usr/local/bin/nostalgiabox
+sudo systemctl daemon-reload
+rm -rf ~/NostalgiaBox
+```
+
+Your videos stay in `/media/nostalgiabox` (delete that folder yourself if you want the space back).
+If you set up a USB storage drive, it is mounted from a marked block in `/etc/fstab`. Before removing
+everything, tap **Use the SD card again** on the Storage card (or delete that block) so the Pi doesn't look for the drive at boot.
 
 ## 🩺 Troubleshooting
 
