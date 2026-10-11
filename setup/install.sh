@@ -49,7 +49,8 @@ if [ "${1:-}" = "--uninstall" ]; then
   for mp in "$MOUNT_DIR"/ch* "$MOUNT_DIR/.browse"; do
     [ -d "$mp" ] && mountpoint -q "$mp" && $SUDO umount "$mp" 2>/dev/null || true
   done
-  $SUDO sed -i '/# >>> nostalgiabox-setup/,/# <<< nostalgiabox-setup/d' /etc/fstab
+  # Only the network-share block. The storage-drive block stays, so shows on the USB drive keep working.
+  $SUDO sed -i '/^# >>> nostalgiabox-setup (managed/,/^# <<< nostalgiabox-setup <<<$/d' /etc/fstab
   $SUDO rm -f "$HELPER" /etc/sudoers.d/nostalgiabox-setup
   $SUDO rm -rf "$APP_DIR" "$ETC_DIR"
   $SUDO systemctl restart nostalgiabox.service 2>/dev/null || true

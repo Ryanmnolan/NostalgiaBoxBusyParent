@@ -142,7 +142,39 @@ at the bottom of the page first so "midnight" is your midnight.
 | Restart the picture | *This box*, *Restart the TV picture* |
 | Turn it off safely | *Shut down* on the page, or the remote's volume-down at 0 |
 | Update this project | `cd ~/NostalgiaBox && git pull && bash setup/install.sh` (settings and shows are kept) |
-| Remove it | `bash ~/NostalgiaBox/setup/install.sh --uninstall` (videos and settings stay) |
+| Remove it | See [Uninstalling](#-uninstalling) (videos and settings stay) |
+
+## 🧹 Uninstalling
+
+**Remove just the setup page** (the TV goes back to NostalgiaBox's own way of working):
+
+```bash
+bash ~/NostalgiaBox/setup/install.sh --uninstall
+```
+
+This removes the setup page, the on-screen remote, the screen-time limit, the saved network-share connections and the "box is ready" screen, and restarts the TV program. It **keeps** your videos, your saved settings (so installing again picks up where you left off), NostalgiaBox itself, and the USB storage drive set-up (so shows on the drive keep playing).
+
+Afterwards NostalgiaBox runs from its own `config.yaml` and makes one channel per folder in `/media/nostalgiabox`. Shows you uploaded through the page are in folders named `channel-1`, `channel-2` and so on, so rename them to the show's name if you want proper channel names.
+
+To also erase the saved settings and the screen-time count:
+
+```bash
+sudo rm -rf /var/lib/nostalgiabox-setup
+```
+
+**Remove NostalgiaBox completely** (optional; your videos in `/media/nostalgiabox` are left alone):
+
+```bash
+bash ~/NostalgiaBox/setup/install.sh --uninstall
+sudo systemctl disable --now nostalgiabox nostalgiabox-usb
+sudo rm -f /etc/systemd/system/nostalgiabox.service /etc/systemd/system/nostalgiabox-usb.service \
+  /etc/udev/rules.d/99-nostalgiabox-usb.rules /etc/sudoers.d/nostalgiabox-poweroff /usr/local/bin/nostalgiabox
+sudo rm -rf /etc/nostalgiabox
+sudo systemctl daemon-reload
+rm -rf ~/NostalgiaBox
+```
+
+Plain Raspberry Pi OS is then back as it was. To also free a USB drive from NostalgiaBox, remove the `nostalgiabox-setup storage drive` lines from `/etc/fstab` first (`sudo nano /etc/fstab`), then reboot.
 
 ## 🩺 Troubleshooting
 
