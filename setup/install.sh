@@ -49,12 +49,13 @@ if [ "${1:-}" = "--uninstall" ]; then
   for mp in "$MOUNT_DIR"/ch* "$MOUNT_DIR/.browse"; do
     [ -d "$mp" ] && mountpoint -q "$mp" && $SUDO umount "$mp" 2>/dev/null || true
   done
-  $SUDO sed -i '/# >>> nostalgiabox-setup/,/# <<< nostalgiabox-setup/d' /etc/fstab
+  # Remove only the network-share block. The storage-drive block stays, so shows on the drive keep working.
+  $SUDO sed -i '/^# >>> nostalgiabox-setup (managed automatically, do not edit) >>>$/,/^# <<< nostalgiabox-setup <<<$/d' /etc/fstab
   $SUDO rm -f "$HELPER" /etc/sudoers.d/nostalgiabox-setup
   $SUDO rm -rf "$APP_DIR" "$ETC_DIR"
   $SUDO systemctl restart nostalgiabox.service 2>/dev/null || true
   echo "Done. NostalgiaBox is back to starting from its own config.yaml."
-  echo "Your videos ($MEDIA_DIR) and settings ($STATE_DIR) were left in place."
+  echo "Your videos ($MEDIA_DIR), settings ($STATE_DIR) and any storage drive were left in place."
   exit 0
 fi
 
