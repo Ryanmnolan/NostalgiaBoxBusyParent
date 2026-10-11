@@ -28,6 +28,32 @@ header.top .wrap{display:flex;align-items:center;gap:10px;padding-top:10px;paddi
 .chip.on{color:var(--accent);border-color:var(--accent-dim)}
 .chip.warn{color:var(--warn);border-color:#6b5a1f}
 main{padding:16px 0 120px}
+.nav{border-top:1px solid var(--line)}
+.nav .wrap{display:flex;gap:4px;padding-top:6px;padding-bottom:6px;overflow-x:auto;scrollbar-width:none}
+.nav .wrap::-webkit-scrollbar{display:none}
+.nav button{flex:1 0 auto;min-height:40px;padding:0 12px;border-radius:10px;border:1px solid transparent;background:none;color:var(--muted);
+  font:700 .9rem var(--sans);cursor:pointer;white-space:nowrap}
+.nav button[aria-selected=true]{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+.picked{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--accent-dim);border-radius:10px;padding:10px 12px;background:rgba(77,255,90,.05)}
+.picked b{overflow-wrap:anywhere;word-break:normal}
+dialog.explorer{width:min(640px,96vw);height:min(560px,88vh);flex-direction:column}
+dialog.explorer[open]{display:flex}
+.xtitle{padding:10px 14px;border-bottom:1px solid var(--line);font:700 .95rem var(--mono);color:var(--accent)}
+.xbar{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:#0c130e}
+.xbar .xb{min-width:44px;min-height:44px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--text);font-size:1.1rem;cursor:pointer}
+.xbar .xb:disabled{opacity:.3;cursor:default}
+.addr{flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:2px;border:1px solid var(--line);border-radius:8px;background:#0a110c;padding:2px 6px;min-height:44px}
+.addr button{background:none;border:0;color:var(--text);cursor:pointer;font:inherit;font-size:.9rem;padding:6px 4px;min-height:36px;border-radius:6px}
+.addr button:hover{background:rgba(77,255,90,.1)}
+.addr span{color:var(--muted)}
+.xbody{flex:1;overflow:auto;padding:6px}
+.xi{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #16201a;color:var(--text);padding:0 10px;min-height:52px;cursor:pointer;font:inherit;border-radius:8px}
+.xi:hover,.xi:focus-visible{background:rgba(77,255,90,.08)}
+.xi .ic{font-size:1.4rem;width:1.6em;text-align:center}
+.xi .nm{flex:1;min-width:0;overflow-wrap:anywhere}
+.xi .ch{color:var(--muted)}
+.xstatus{padding:6px 14px;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted);min-height:32px}
+dialog.explorer .df{margin-top:auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 16px}
 .card>h2{margin-bottom:4px}
 .hint{color:var(--muted);font-size:.9rem;margin:2px 0 12px}
@@ -61,7 +87,6 @@ input[type=color]{width:56px;height:44px;border:1px solid var(--line);border-rad
 .rbtn:active{background:rgba(77,255,90,.18)}
 .rbtn:disabled{opacity:.35;cursor:default}
 .rbtn.small{font-size:.85rem}
-#remotebox>summary{cursor:pointer;list-style:none;min-height:32px}#remotebox>summary::-webkit-details-marker{display:none}#remotebox>summary::after{content:" ▾";color:var(--muted)}#remotebox[open]>summary::after{content:" ▴"}
 #fmtform{padding:16px}
 #fmtform .row{margin-top:12px}
 .drive{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px}
@@ -161,18 +186,24 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
   <span class="logo">NOSTALGIABOX</span>
   <span class="chip" id="tvchip">TV: …</span>
   <button class="btn small" id="logout">Log out</button>
-</div></header>
+</div>
+<nav class="nav" aria-label="Pages"><div class="wrap" role="tablist">
+  <button type="button" role="tab" data-nav="channels" aria-selected="true">Channels</button>
+  <button type="button" role="tab" data-nav="remote" aria-selected="false">Remote</button>
+  <button type="button" role="tab" data-nav="storage" aria-selected="false">Storage</button>
+  <button type="button" role="tab" data-nav="settings" aria-selected="false">Settings</button>
+  <button type="button" role="tab" data-nav="system" aria-selected="false">System</button>
+</div></nav></header>
 
 <main class="wrap">
 
 <div class="banner" id="pwbanner" hidden>
-  You're still using the starting password. <a href="#sec-security" id="pwlink">Change it now</a> so nobody else on your network can change the box.
+  You're still using the starting password. <a href="#system" id="pwlink">Change it now</a> so nobody else on your network can change the box.
 </div>
 
 <!-- ---------- Remote ---------- -->
-<section class="card" id="sec-remote">
-  <details id="remotebox">
-  <summary><h2 style="display:inline">Remote</h2></summary>
+<section class="card" id="sec-remote" data-page="remote">
+  <h2>Remote</h2>
   <p class="hint" id="remotehint">A remote for the TV, for when the real one is lost or the kids aren't listening.</p>
   <div class="remote">
     <div class="rgrid">
@@ -194,11 +225,10 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
     </div>
     <p class="msg" id="remotemsg" role="status"></p>
   </div>
-  </details>
 </section>
 
 <!-- ---------- Channels ---------- -->
-<section class="card" id="sec-channels">
+<section class="card" id="sec-channels" data-page="channels">
   <h2>Channels</h2>
   <p class="hint">Each channel plays one show on endless shuffle. Pick how many, then fill in each tab.</p>
   <div class="grid2">
@@ -212,7 +242,7 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 </section>
 
 <!-- ---------- Storage ---------- -->
-<section class="card" id="sec-storage">
+<section class="card" id="sec-storage" data-page="storage">
   <h2>Storage</h2>
   <p class="hint" id="storagehint">Where uploaded shows are kept. A USB drive holds far more than the SD card, and keeps the card from wearing out.</p>
   <p class="status" id="storagenow"></p>
@@ -239,7 +269,7 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 </dialog>
 
 <!-- ---------- Playback ---------- -->
-<section class="card" id="sec-playback">
+<section class="card" id="sec-playback" data-page="settings">
   <h2>Playback</h2>
   <p class="hint">What happens when you flip to a channel.</p>
   <div class="stack">
@@ -275,7 +305,7 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 </section>
 
 <!-- ---------- Sound ---------- -->
-<section class="card" id="sec-sound">
+<section class="card" id="sec-sound" data-page="settings">
   <h2>Sound</h2>
   <div class="stack">
     <label class="field"><span>Sound comes out of</span>
@@ -297,7 +327,7 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 </section>
 
 <!-- ---------- Picture ---------- -->
-<section class="card" id="sec-picture">
+<section class="card" id="sec-picture" data-page="settings">
   <h2>Picture</h2>
   <p class="hint">The old-TV look.</p>
   <div class="stack">
@@ -315,7 +345,7 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 </section>
 
 <!-- ---------- Screen time ---------- -->
-<section class="card" id="sec-time">
+<section class="card" id="sec-time" data-page="settings">
   <h2>Daily screen time</h2>
   <p class="hint">After the limit, the TV shows "off the air" static until the next day. Unplugging the box doesn't reset it.</p>
   <div class="stack">
@@ -331,7 +361,7 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 </section>
 
 <!-- ---------- Security ---------- -->
-<section class="card" id="sec-security">
+<section class="card" id="sec-security" data-page="system">
   <h2>Password</h2>
   <p class="hint">This is the password for this page (username <b id="uname">admin</b>).</p>
   <form class="stack" id="pwform" autocomplete="off">
@@ -346,7 +376,7 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 </section>
 
 <!-- ---------- This box ---------- -->
-<section class="card" id="sec-box">
+<section class="card" id="sec-box" data-page="system">
   <h2>This box</h2>
   <div class="kv" id="boxinfo"></div>
   <div class="stack">
@@ -366,20 +396,26 @@ ul.warns{margin:8px 0 0;padding-left:20px;color:var(--warn)}
 
 </main>
 
-<div class="savebar"><div class="wrap">
+<div class="savebar" id="savebar"><div class="wrap">
   <span id="savemsg"></span>
   <button class="btn primary" id="save">Save &amp; apply</button>
 </div></div>
 </div>
 
 <!-- ======================= network folder browser ======================= -->
-<dialog id="browser">
-  <div class="dh"><h2 id="btitle">Choose a folder</h2><div class="crumbs" id="crumbs"></div></div>
-  <div class="db" id="blist"></div>
+<dialog id="browser" class="explorer" aria-labelledby="btitle">
+  <div class="xtitle" id="btitle">Choose a folder</div>
+  <div class="xbar">
+    <button class="xb" id="bup" type="button" aria-label="Up one level" title="Up">&#8593;</button>
+    <div class="addr" id="crumbs" aria-label="Where you are"></div>
+    <button class="xb" id="bref" type="button" aria-label="Refresh" title="Refresh">&#8635;</button>
+  </div>
+  <div class="xbody" id="blist"></div>
+  <div class="xstatus" id="bcount"></div>
   <div class="df">
-    <span class="grow" id="bcount"></span>
+    <span class="grow" id="bpick"></span>
     <button class="btn" id="bcancel" type="button">Cancel</button>
-    <button class="btn primary" id="buse" type="button">Use this folder</button>
+    <button class="btn primary" id="buse" type="button" disabled>Use this folder</button>
   </div>
 </dialog>
 
@@ -463,6 +499,7 @@ async function boot() {
   dirty = false; passwords = {};
   buildStatic();
   renderAll();
+  showPage(location.hash.slice(1) || "channels", true);
   updateRemote();
   scanDrives();
   refreshCounts();
@@ -742,72 +779,133 @@ window.addEventListener("beforeunload", e => { if (dirty || uploading) { e.preve
 /* ------ network */
 function networkHTML(i) {
   const n = S.channels[i].net, smb = n.type === "smb";
+  const where = n.share ? (smb ? `\\\\${n.host}\\${n.share}${n.subfolder ? "\\" + n.subfolder.replace(/\//g, "\\") : ""}` : `${n.host}:${n.share}${n.subfolder ? "/" + n.subfolder : ""}`) : "";
   return `
     <div class="stack" style="margin-top:14px">
       <div class="seg" role="radiogroup" aria-label="Kind of share">
         <label><input type="radio" name="ntype" value="smb" ${smb ? "checked" : ""}><span>SMB (Windows/Unraid)</span></label>
         <label><input type="radio" name="ntype" value="nfs" ${!smb ? "checked" : ""}><span>NFS</span></label>
       </div>
-      <div class="grid2">
-        <label class="field"><span>Server (name or IP address)</span>
-          <input type="text" data-n="host" value="${esc(n.host)}" placeholder="192.168.1.20 or tower.local" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
-        <label class="field"><span>${smb ? "Share name" : "NFS export path"}</span>
-          <input type="text" data-n="share" value="${esc(n.share)}" placeholder="${smb ? "media" : "/mnt/user/media"}" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
-      </div>
+      <label class="field"><span>Server (name or IP address)</span>
+        <input type="text" data-n="host" value="${esc(n.host)}" placeholder="192.168.1.20 or tower.local" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
       ${smb ? `<div class="grid2">
-        <label class="field"><span>Username</span>
+        <label class="field"><span>Username (empty = guest)</span>
           <input type="text" data-n="username" value="${esc(n.username)}" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"></label>
         <label class="field"><span>Password</span>
           <input type="password" data-pw value="${esc(passwords[i] ?? "")}" placeholder="${n.has_password ? "saved: type to change" : ""}" autocomplete="new-password"></label>
-      </div>
-      <p class="hint" style="margin:0">Leave username and password empty for a public (guest) share.</p>` : ""}
+      </div>` : ""}
+      ${where ? `<div class="picked"><span>Folder:</span> <b data-where>${esc(where)}</b></div>` : `<p class="hint" style="margin:0">No folder chosen yet.</p>`}
       <div class="row">
-        <button class="btn" type="button" data-act="browse">Connect &amp; choose folder…</button>
+        <button class="btn primary" type="button" data-act="browse">${n.share ? "Change folder…" : "Browse the server…"}</button>
       </div>
       <p class="msg" id="netmsg" role="status"></p>
-      <label class="field"><span>Folder inside the share (optional)</span>
-        <input type="text" data-n="subfolder" value="${esc(n.subfolder)}" placeholder="Kids TV/Arthur" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+      <details class="adv"><summary>Type the share and folder yourself (optional)</summary>
+        <div class="grid2" style="margin-top:10px">
+          <label class="field"><span>${smb ? "Share name" : "NFS export path"}</span>
+            <input type="text" data-n="share" value="${esc(n.share)}" placeholder="${smb ? "media" : "/mnt/user/media"}" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+          <label class="field"><span>Folder inside the share</span>
+            <input type="text" data-n="subfolder" value="${esc(n.subfolder)}" placeholder="Kids TV/Arthur" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+        </div>
+      </details>
       <p class="hint" style="margin:0">Episodes in sub-folders (like seasons) are found automatically. Nothing on the server is ever changed: the box only reads.</p>
     </div>`;
 }
 
-let browseSlot = 0, browsePath = "", browseData = null;
-async function openBrowser(i) {
-  const ch = S.channels[i], n = ch.net, msg = $("#netmsg");
-  msg.className = "msg"; msg.textContent = "Connecting…";
-  const body = { net: n, password: passwords[i] };
+/* ------------------------------------------- Windows-style folder browser */
+const bs = { slot: 0, level: "shares", share: "", path: "", shares: [] };
+const netBody = i => {
+  const n = S.channels[i].net, body = { net: n, password: passwords[i] };
   if (passwords[i] === undefined && n.has_password) body.saved_channel = i + 1;
+  return body;
+};
+async function openBrowser(i) {
+  const n = S.channels[i].net, msg = $("#netmsg");
+  bs.slot = i; bs.share = ""; bs.path = ""; bs.shares = []; bs.level = "shares";
+  $("#btitle").textContent = `Channel ${channelNumber(i)}: pick the folder with the episodes`;
+  msg.className = "msg"; msg.textContent = n.host ? "Looking at the server…" : "";
+  if (!n.host) { msg.className = "msg err"; msg.textContent = "Type the server's name or IP address first."; return; }
   try {
-    await api("/api/net/connect", { method: "POST", json: body });
+    const r = await api("/api/net/shares", { method: "POST", json: netBody(i) });
+    bs.shares = r.shares;
   } catch (e) { if (e.message !== "login") { msg.className = "msg err"; msg.textContent = e.message; } return; }
   msg.textContent = "";
-  browseSlot = i;
-  $("#btitle").textContent = `Channel ${channelNumber(i)}: pick the folder`;
   $("#browser").showModal();
-  await browseTo(n.subfolder || "", true);
+  if (n.share) await openShare(n.share, n.subfolder || "");   // "Change folder": start where it is now
+  else renderShares();
+}
+function crumbHTML() {
+  const n = S.channels[bs.slot].net, host = n.host;
+  let h = `<button type="button" data-go="shares">&#128421; ${esc(host)}</button>`;
+  if (bs.level === "folder") {
+    h += `<span>&rsaquo;</span><button type="button" data-p="">${esc(bs.share)}</button>`;
+    const parts = bs.path ? bs.path.split("/") : [];
+    h += parts.map((p, k) => `<span>&rsaquo;</span><button type="button" data-p="${esc(parts.slice(0, k + 1).join("/"))}">${esc(p)}</button>`).join("");
+  }
+  return h;
+}
+function renderShares() {
+  bs.level = "shares"; bs.share = ""; bs.path = "";
+  $("#crumbs").innerHTML = crumbHTML();
+  const smb = S.channels[bs.slot].net.type === "smb";
+  $("#blist").innerHTML = bs.shares.length
+    ? bs.shares.map(s => `<button class="xi" type="button" data-s="${esc(s)}"><span class="ic">&#128451;</span><span class="nm">${esc(s)}</span><span class="ch">&rsaquo;</span></button>`).join("")
+    : `<p class="hint" style="padding:10px">${smb ? "This server isn't offering any shares to this user." : "This server isn't offering any NFS exports to this box."}</p>`;
+  $("#bcount").textContent = `${bs.shares.length} ${smb ? "share" : "export"}${bs.shares.length === 1 ? "" : "s"} on this server. Tap one to open it.`;
+  $("#bpick").textContent = ""; $("#buse").disabled = true; $("#bup").disabled = true;
+}
+async function openShare(share, path) {
+  const n = S.channels[bs.slot].net;
+  $("#blist").innerHTML = `<p class="hint" style="padding:10px">Opening ${esc(share)}…</p>`;
+  try {
+    const body = netBody(bs.slot); body.net = Object.assign({}, n, { share });
+    await api("/api/net/connect", { method: "POST", json: body });
+  } catch (e) {
+    if (e.message === "login") return;
+    $("#blist").innerHTML = `<p class="msg err" style="padding:10px">${esc(e.message)}</p>`;
+    $("#bup").disabled = false; return;
+  }
+  bs.share = share; bs.level = "folder";
+  await browseTo(path || "", true);
 }
 async function browseTo(path, fallback) {
   const list = $("#blist");
-  list.innerHTML = `<p class="hint">Loading…</p>`;
-  try {
-    browseData = await api(`/api/net/ls?path=${encodeURIComponent(path)}`);
-  } catch (e) {
+  list.innerHTML = `<p class="hint" style="padding:10px">Loading…</p>`;
+  let d;
+  try { d = await api(`/api/net/ls?path=${encodeURIComponent(path)}`); }
+  catch (e) {
     if (fallback && path) return browseTo("", false);
-    list.innerHTML = `<p class="msg err">${esc(e.message)}</p>`; return;
+    list.innerHTML = `<p class="msg err" style="padding:10px">${esc(e.message)}</p>`; return;
   }
-  browsePath = browseData.path;
-  const parts = browsePath ? browsePath.split("/") : [];
-  $("#crumbs").innerHTML = `<button type="button" data-p="">${esc(S.channels[browseSlot].net.share || "share")}</button>` +
-    parts.map((p, k) => `<span>/</span><button type="button" data-p="${esc(parts.slice(0, k + 1).join("/"))}">${esc(p)}</button>`).join("");
-  list.innerHTML = browseData.dirs.length
-    ? browseData.dirs.map(d => `<button class="dir" type="button" data-d="${esc(d)}">${esc(d)}</button>`).join("")
-    : `<p class="hint">No more folders in here.</p>`;
-  $("#bcount").textContent = `${browseData.episodes}${browseData.episodes_more ? "+" : ""} video${browseData.episodes === 1 ? "" : "s"} in this folder (including folders inside it)`;
+  bs.path = d.path; bs.level = "folder";
+  $("#crumbs").innerHTML = crumbHTML();
+  list.innerHTML = d.dirs.length
+    ? d.dirs.map(x => `<button class="xi" type="button" data-d="${esc(x)}"><span class="ic">&#128193;</span><span class="nm">${esc(x)}</span><span class="ch">&rsaquo;</span></button>`).join("")
+    : `<p class="hint" style="padding:10px">No more folders in here.</p>`;
+  $("#bcount").textContent = `${d.episodes}${d.episodes_more ? "+" : ""} video${d.episodes === 1 ? "" : "s"} in this folder (including folders inside it)`;
+  $("#bpick").textContent = "";
+  $("#buse").disabled = false; $("#bup").disabled = false;
 }
-$("#crumbs").addEventListener("click", e => { const b = e.target.closest("[data-p]"); if (b) browseTo(b.dataset.p); });
-$("#blist").addEventListener("click", e => { const b = e.target.closest("[data-d]"); if (b) browseTo(browsePath ? browsePath + "/" + b.dataset.d : b.dataset.d); });
+function browseUp() {
+  if (bs.level !== "folder") return;
+  if (bs.path) browseTo(bs.path.split("/").slice(0, -1).join("/"));
+  else renderShares();
+}
+$("#crumbs").addEventListener("click", e => {
+  const g = e.target.closest("[data-go]"); if (g) { renderShares(); return; }
+  const b = e.target.closest("[data-p]"); if (b) browseTo(b.dataset.p);
+});
+$("#blist").addEventListener("click", e => {
+  const s = e.target.closest("[data-s]"); if (s) { openShare(s.dataset.s, ""); return; }
+  const b = e.target.closest("[data-d]"); if (b) browseTo(bs.path ? bs.path + "/" + b.dataset.d : b.dataset.d);
+});
+$("#bup").addEventListener("click", browseUp);
+$("#bref").addEventListener("click", async () => {
+  if (bs.level === "folder") browseTo(bs.path);
+  else { try { bs.shares = (await api("/api/net/shares", { method: "POST", json: netBody(bs.slot) })).shares; renderShares(); } catch (_) {} }
+});
 $("#buse").addEventListener("click", () => {
-  S.channels[browseSlot].net.subfolder = browsePath;
+  const n = S.channels[bs.slot].net;
+  n.share = bs.share; n.subfolder = bs.path;
   markDirty(); $("#browser").close(); renderPanel();
 });
 $("#bcancel").addEventListener("click", () => $("#browser").close());
@@ -853,7 +951,7 @@ function showResult(r) {
 $("#rok").addEventListener("click", () => $("#resultdlg").close());
 
 /* ------------------------------------------------------------ password */
-$("#pwlink").addEventListener("click", () => setTimeout(() => $("#pw0").focus(), 400));
+$("#pwlink").addEventListener("click", e => { e.preventDefault(); showPage("system"); setTimeout(() => $("#pw0").focus(), 100); });
 $("#pwform").addEventListener("submit", async e => {
   e.preventDefault();
   const m = $("#pwmsg"); m.className = "msg";
@@ -885,6 +983,20 @@ async function sysAction(action, value, okText) {
 }
 $("#tzset").addEventListener("click", () => sysAction("timezone", $("#tz").value, "Time zone changed."));
 
+
+// ---- pages
+const PAGES = ["channels", "remote", "storage", "settings", "system"];
+let page = "channels";
+function showPage(p, quiet) {
+  if (!PAGES.includes(p)) p = "channels";
+  page = p;
+  $$("[data-page]").forEach(el => { el.hidden = el.dataset.page !== p; });
+  $$("[data-nav]").forEach(b => b.setAttribute("aria-selected", b.dataset.nav === p ? "true" : "false"));
+  $("#savebar").hidden = !(p === "channels" || p === "settings");
+  if (!quiet) { try { history.replaceState(null, "", "#" + p); } catch (_) {} window.scrollTo(0, 0); }
+}
+$$("[data-nav]").forEach(b => b.addEventListener("click", () => showPage(b.dataset.nav)));
+window.addEventListener("hashchange", () => showPage(location.hash.slice(1), true));
 
 // ---- storage drive
 let DRIVES = [];
@@ -941,8 +1053,6 @@ $("#usesd").addEventListener("click", async () => {
   catch (e) { if (e.message !== "login") { $("#storagemsg").className = "msg err"; $("#storagemsg").textContent = e.message; } }
 });
 // ---- on-screen remote
-try { if (localStorage.getItem("nb-remote-open") === "1") $("#remotebox").open = true; } catch (_) {}
-$("#remotebox").addEventListener("toggle", () => { try { localStorage.setItem("nb-remote-open", $("#remotebox").open ? "1" : "0"); } catch (_) {} });
 setInterval(async () => {
   if ($("#app").hidden || document.hidden) return;
   try { const d = await api("/api/state"); ST = d.status; updateRemote(); } catch (_) {}

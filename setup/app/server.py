@@ -345,6 +345,26 @@ def h_net_connect(h):
     h.send_json({"ok": True})
 
 
+def h_net_shares(h):
+    b = h.read_json()
+    try:
+        ch = nb.sanitize_channel({"source": "network", "net": b.get("net")})
+    except ValueError as e:
+        raise ApiError(str(e))
+    n = ch["net"]
+    if not n["host"]:
+        raise ApiError("Type the server's name or IP address first.")
+    req = {"net": {k: n[k] for k in ("type", "host", "username")},
+           "password": b.get("password") if isinstance(b.get("password"), str) else None}
+    saved = b.get("saved_channel")
+    if req["password"] is None and isinstance(saved, int):
+        req["saved_channel"] = saved
+    res = nb.call_helper("list-shares", req, timeout=60)
+    if not res.get("ok"):
+        raise ApiError(res.get("error") or "Couldn't get the list of shares.", 502)
+    h.send_json({"shares": res.get("shares", [])})
+
+
 def h_net_ls(h):
     if not _net["connected"]:
         raise ApiError("Connect to the server first.", 409)
@@ -482,6 +502,7 @@ ROUTES = {
     ("GET", "/api/files"): h_files,
     ("PUT", "/api/upload"): h_upload,
     ("POST", "/api/files/delete"): h_delete_file,
+    ("POST", "/api/net/shares"): h_net_shares,
     ("POST", "/api/net/connect"): h_net_connect,
     ("GET", "/api/net/ls"): h_net_ls,
     ("POST", "/api/net/disconnect"): h_net_disconnect,
