@@ -135,6 +135,7 @@ $SUDO systemctl restart nostalgiabox.service
 sleep 2
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 HOST="$(hostname)"
+[ -n "$IP" ] || IP="(this box's IP address)"
 cat <<EOF
 
 =========================================================================
@@ -143,7 +144,7 @@ cat <<EOF
   In a minute the TV shows a "Box is ready" screen. From your phone or
   computer (same network) open:
 
-      http://${IP:-<the box's address>}:${PORT}
+      http://${IP}:${PORT}
       or  http://${HOST}.local:${PORT}
 
   Username:  admin
