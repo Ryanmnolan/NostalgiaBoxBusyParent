@@ -7,16 +7,19 @@
 ![Raspberry Pi 4](https://img.shields.io/badge/Raspberry%20Pi-4-c51a4a?logo=raspberrypi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3%20(stdlib%20only)-3776ab?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-untested%20on%20real%20hardware-orange)
+![Status](https://img.shields.io/badge/status-tested%20on%20a%20real%20Pi%20with%20network%20shows-yellowgreen)
 
 </div>
 
 NostalgiaBox turns a Raspberry Pi into a retro kids-TV channel box. This project adds the part
 that makes it friendly for a family: **install once, then do everything from your phone.**
 
-> **Heads-up:** this was built and tested against stand-ins for NostalgiaBox and the network
-> (see [Tests](#tests)). It has **not yet been run on a real Pi 4 with a TV**. See
-> [Honest notes](#honest-notes) and please open an issue if something doesn't behave.
+> **Status:** tested on a real Raspberry Pi with a TV, with shows played from a **network share (SMB)**.
+> The setup page, the channel tabs, the folder browser, HDMI sound and playback all worked.
+> **Still to test:** shows saved on a **USB drive** (the Storage tab and formatting).
+> It was tried on a **Pi 3**, which was too slow (see [Honest notes](#honest-notes)). It is built for a
+> **Pi 4 or newer**, where it is expected to run smoothly, but that hasn't been confirmed on a Pi 4 yet.
+> Please open an issue if something doesn't behave.
 
 ## ✨ What you get
 
@@ -39,7 +42,7 @@ that makes it friendly for a family: **install once, then do everything from you
 
 | | |
 |---|---|
-| Computer | Raspberry Pi 4 (the same hardware NostalgiaBox uses) |
+| Computer | Raspberry Pi 4 or newer (a Pi 3 is too slow for smooth video) |
 | OS | Raspberry Pi OS Lite, 64-bit |
 | Remote | Flirc + any remote, as in the NostalgiaBox README |
 | Network | Wi-Fi or Ethernet, same network as your phone |
@@ -187,9 +190,15 @@ everything, tap **Use the SD card again** on the Storage card (or delete that bl
 
 ## 🔍 Honest notes
 
-- **Untested on real hardware.** Everything passes in automated tests (below), and the config this
-  page writes is accepted by the real `nostalgiabox --check`. But real SMB/NFS mounts, Pi 4 speed
-  and the actual TV output haven't been tried yet.
+- **What's been tried on real hardware:** a real Pi and TV, with shows on a network share, the folder
+  browser, and HDMI sound. **Not yet tried:** shows stored on a USB drive, NFS shares, and a Pi 4.
+- **Use a Pi 4 or newer.** On a **Pi 3** the picture lagged and drifted out of sync with the sound, and
+  the Pi got hot and slowed itself down. The Pi 3 can still run the setup page. If you must use one, add
+  a heatsink or fan, turn off the CRT look in *Settings*, set the TV output to 720p or lower, and use
+  small 480p H.264 files.
+- **Sound.** Pi OS names the HDMI sound device differently from one version to the next. The page reads
+  the real name from the Pi, and *Automatic* prefers HDMI. If there's still no sound, choose the other
+  HDMI port in *Settings*.
 - **Depends on NostalgiaBox.** It needs NostalgiaBox's `--config` option and its
   `nostalgiabox.service`. The installer reads that service to learn how NostalgiaBox starts. If
   upstream changes those, this may need an update.
@@ -227,7 +236,7 @@ python3 setup/tests/test_controller.py   # TV mode switching and remote key pres
 
 ## 🤝 Contributing
 
-Issues and pull requests are welcome, especially reports from a real Pi 4 and TV.
+Issues and pull requests are welcome, especially reports from a Pi 4 and TV, and from shows played off a USB drive.
 
 ## 🙏 Credits & license
 
