@@ -29,10 +29,10 @@ header.top .wrap{display:flex;align-items:center;gap:10px;padding-top:10px;paddi
 .chip.warn{color:var(--warn);border-color:#6b5a1f}
 main{padding:16px 0 120px}
 .nav{border-top:1px solid var(--line)}
-.nav .wrap{display:flex;gap:4px;padding-top:6px;padding-bottom:6px;overflow-x:auto;scrollbar-width:none}
+.nav .wrap{display:flex;gap:2px;padding-top:6px;padding-bottom:6px;overflow-x:auto;scrollbar-width:none}
 .nav .wrap::-webkit-scrollbar{display:none}
-.nav button{flex:1 0 auto;min-height:40px;padding:0 12px;border-radius:10px;border:1px solid transparent;background:none;color:var(--muted);
-  font:700 .9rem var(--sans);cursor:pointer;white-space:nowrap}
+.nav button{flex:1 1 0;min-width:0;min-height:40px;padding:0 4px;border-radius:10px;border:1px solid transparent;background:none;color:var(--muted);
+  font:700 clamp(.66rem,3.1vw,.9rem) var(--sans);cursor:pointer;white-space:nowrap}
 .nav button[aria-selected=true]{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
 .picked{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--accent-dim);border-radius:10px;padding:10px 12px;background:rgba(77,255,90,.05)}
 .picked b{overflow-wrap:anywhere;word-break:normal}
