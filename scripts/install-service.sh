@@ -32,6 +32,8 @@ sed \
 
 echo "==> Installing ${TARGET}"
 sudo cp "${tmp}" "${TARGET}"
+# mktemp makes the file private (600); a unit file must be readable by everyone.
+sudo chmod 644 "${TARGET}"
 rm -f "${tmp}"
 
 echo "==> Allowing '${RUN_USER}' to power off without a password (for the"
