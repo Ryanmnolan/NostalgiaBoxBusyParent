@@ -66,6 +66,8 @@ bash ~/NostalgiaBox/setup/install.sh
 It installs NostalgiaBox first if it's missing (answer `y` if asked), then the setup page. It takes
 several minutes. When the box with the web address appears, you can close the terminal for good.
 
+<p align="center"><img src="docs/images/tv-ready.jpg" alt="The TV showing the NostalgiaBox address and login" width="560"><br><sub>The TV shows the address to open and the login (after you set your own password it says "the one you chose").</sub></p>
+
 **3. Log in.** The TV now shows **BOX IS READY** with the address. On a phone or computer on the same
 network open it (for example `http://192.168.1.57:8080` or `http://nostalgiabox.local:8080`) and log in:
 
@@ -95,6 +97,8 @@ Prefer typing? Open *Type it in yourself* to enter the share name and sub-folder
 The mount is read-only, saved in `/etc/fstab`, and retried every minute if the server is off, so it
 recovers by itself. Use *Skip some episodes* to hide seasons (`6-25`) or names (`*special*`).
 
+<p align="center"><img src="docs/images/channels.jpg" alt="Channels page with a network folder chosen" width="300"><br><sub>The Channels page: one tab per channel, with the server, login and chosen folder.</sub></p>
+
 > **Using Plex?** The box reads the same files Plex does. On Unraid, turn on SMB (or NFS) export for
 > the share. The page doesn't talk to Plex itself.
 
@@ -121,14 +125,18 @@ Uploads normally go on the SD card. A USB drive holds far more and spares the ca
 
 Good to know: the page only offers USB drives, never the SD card. If the drive isn't plugged in at boot, the box still starts (no shows until you plug it in). **Use the SD card again** switches back; shows on the drive stay on the drive. ext4 isn't readable by Windows or Mac directly; add shows through this page, or over the network.
 
+<p align="center"><img src="docs/images/storage.jpg" alt="Storage page listing a USB drive" width="300"><br><sub>The Storage page lists USB drives it can use.</sub></p>
+
 ## 🎮 The on-screen remote
 
-Open the **Remote** card at the top of the page (tap it to expand). It presses the same keys your
+Open the **Remote** tab. It presses the same keys your
 Flirc remote sends: **CH ▲/▼**, **VOL −/+**, **MUTE**, **LAST**, **INFO**, **STANDBY** (blank screen) and the number
 pad with **OK** for typing a channel number. It works while the TV is showing channels; it pauses
 on the "box is ready" screen and during "OFF THE AIR". The real remote and the TV's own remote keep working.
 
 It can't quit NostalgiaBox, and it needs the same login as the rest of the page.
+
+<p align="center"><img src="docs/images/remote.jpg" alt="The on-screen remote" width="300"></p>
 
 ## ⏱ Daily screen time
 
@@ -137,6 +145,8 @@ counts only while a show is playing and is saved to the SD card every 30 seconds
 at the bottom of the page first so "midnight" is your midnight.
 
 ## 🛠 Everyday use
+
+<p align="center"><img src="docs/images/settings.jpg" alt="Settings page: playback, sound and picture" width="300"> &nbsp; <img src="docs/images/system.jpg" alt="System page: password, time zone, restart and shut down" width="300"><br><sub>Settings (playback, sound, picture, screen time) and System (password, time zone, restart, shut down).</sub></p>
 
 | To do this | Do this |
 |---|---|
