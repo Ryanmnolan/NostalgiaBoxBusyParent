@@ -75,7 +75,7 @@ else
   NB_HOME="$APP_HOME/NostalgiaBox"
 fi
 as_user() { if [ -n "$SUDO" ]; then "$@"; else sudo -u "$APP_USER" "$@"; fi; }
-if systemctl cat nostalgiabox.service >/dev/null 2>&1; then
+if $SUDO systemctl cat nostalgiabox.service >/dev/null 2>&1; then
   say "NostalgiaBox is already installed. Keeping it."
 else
   say "Installing NostalgiaBox"
@@ -89,7 +89,7 @@ else
   say "Setting NostalgiaBox up to start on boot"
   ( cd "$NB_HOME" && as_user ./scripts/install.sh --service )
 fi
-systemctl cat nostalgiabox.service >/dev/null 2>&1 || \
+$SUDO systemctl cat nostalgiabox.service >/dev/null 2>&1 || \
   die "NostalgiaBox's service isn't there. Run './scripts/install.sh --service' in $NB_HOME, then run this again."
 
 # ---- 3. folders -------------------------------------------------------------

@@ -196,10 +196,12 @@ else
 fi
 
 echo "==> Checking the setup (it is normal to have no shows yet)"
+trap - ERR  # "not ready yet" here is expected, so do not report it as an install failure
 set +e
 /usr/local/bin/nostalgiabox --check
 check_status=$?
 set -e
+trap 'on_error ${LINENO}' ERR
 if [[ "${check_status}" -eq 2 ]]; then
   echo "error: the configuration file has a problem. The report above says how to fix it." >&2
   exit 1
