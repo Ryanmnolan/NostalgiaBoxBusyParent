@@ -63,7 +63,7 @@ fi
 # ---- 1. packages ------------------------------------------------------------
 say "Installing packages (a minute or two)"
 $SUDO apt-get update
-$SUDO apt-get install -y git python3 python3-yaml python3-pil fonts-dejavu-core ffmpeg cifs-utils nfs-common
+$SUDO apt-get install -y git python3 python3-yaml python3-pil fonts-dejavu-core ffmpeg cifs-utils smbclient nfs-common
 python3 -c "import yaml, PIL" || die "Python libraries (yaml, PIL) are missing."
 
 # ---- 2. NostalgiaBox itself -------------------------------------------------

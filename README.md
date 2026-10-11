@@ -24,7 +24,7 @@ that makes it friendly for a family: **install once, then do everything from you
 - **Two ways to fill a channel.**
   - **Upload** videos straight from your phone or computer (files, folders, drag and drop, with progress).
   - **Network folder.** Point a channel at a share on your Unraid / NAS / Windows PC (**SMB or NFS**) and pick the folder with a built-in browser. Read-only: the box can never change your server.
-- **Everything on one page.** Playback, sound output, the CRT look, daily screen time, the page password, time zone, restart, reboot and shut down.
+- **Five short pages** (tabs at the top): **Channels** (one tab per channel), **Remote**, **Storage**, **Settings** (playback, sound, picture, screen time) and **System** (password, time zone, restart, reboot, shut down).
 - **"Box is ready" on the TV.** After install the TV shows the address and login, and tells you to log in and change the password.
 - **An on-screen remote.** For when the real remote is lost or the kids aren't listening: channel up/down, volume, mute, number pad, OK, info, last channel and standby, right on the page.
 - **Storage drive setup.** Plug in a USB drive and format it for your shows from the page. Safer for a box that gets unplugged, and far more room than the SD card.
@@ -83,10 +83,11 @@ Uploads land in `/media/nostalgiabox/channel-N/` on the SD card, so watch the fr
 
 ### Network folder (best if the shows are on Unraid, a NAS or a PC)
 1. Choose **SMB** (Windows / Unraid / most NAS) or **NFS**.
-2. Enter the **server** name or IP.
-3. Enter the **share name** (SMB) or **export path**, like `/mnt/user/media` (NFS).
-4. Enter a username and password for SMB, or leave both empty for a guest share.
-5. Tap **Connect & choose folder…**, browse into the show's folder, then **Use this folder**.
+2. Enter the **server** name or IP, plus a username and password for SMB (leave both empty for a guest share).
+3. Tap **Browse the server…**. A window like Windows Explorer opens: SMB shows the server's shares, NFS its exports. Tap one to open it, then click through the folders (the address bar, **Up** and **Refresh** work as you'd expect).
+4. When you're in the show's folder, tap **Use this folder**.
+
+Prefer typing? Open *Type it in yourself* to enter the share name and sub-folder by hand. Browsing SMB shares needs `smbclient` (the installer adds it; re-run `bash install.sh` after updating).
 
 The mount is read-only, saved in `/etc/fstab`, and retried every minute if the server is off, so it
 recovers by itself. Use *Skip some episodes* to hide seasons (`6-25`) or names (`*special*`).

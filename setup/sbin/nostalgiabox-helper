@@ -7,6 +7,7 @@ sudo for the NostalgiaBox user (see /etc/sudoers.d/nostalgiabox-setup).
 Usage:  nostalgiabox-helper <command>   (JSON request on stdin, JSON answer on stdout)
 
 Commands:
+  list-shares    list the shares/exports a server offers (so the page can show them to click on)
   browse-mount   mount a network share at a temporary spot so the page can browse it
   browse-umount  unmount that temporary share
   apply-mounts   make /etc/fstab + the mounts match the channels saved on the page
@@ -81,6 +82,16 @@ def app_ids():
 
 def explain_mount_error(text):
     t = (text or "").lower()
+    if "nt_status_logon_failure" in t or "nt_status_access_denied" in t or "nt_status_wrong_password" in t:
+        return ("The server said no. Check the username and password, and that the share "
+                "allows this user (for NFS: that the share's NFS rules allow this box's address).")
+    if "nt_status_host_unreachable" in t or "nt_status_io_timeout" in t or "nt_status_connection_refused" in t \
+            or "nt_status_unsuccessful" in t or "connection to" in t and "failed" in t:
+        return "Can't reach that server. Check it is on, on the same network, and the address is right."
+    if "nt_status_bad_network_name" in t:
+        return "Found the server, but not that share or folder. Check the spelling."
+    if "program not registered" in t or "rpc: unable to receive" in t or "clnt_create" in t:
+        return "That server isn't offering NFS shares to this box. Check NFS is turned on and allows this box's address."
     if "no such file" in t or "error(2)" in t or "bad network name" in t or "does not exist" in t:
         return "Found the server, but not that share or folder. Check the spelling."
     if "permission denied" in t or "error(13)" in t or "logon failure" in t or "access denied" in t \
@@ -191,6 +202,87 @@ def umount(path):
 
 
 # ----------------------------------------------------------------- commands
+def clean_server(n):
+    """Like clean_net, but for listing shares: no share name needed yet."""
+    if not isinstance(n, dict):
+        raise Fail("Missing network settings.")
+    t = n.get("type")
+    if t not in ("smb", "nfs"):
+        raise Fail("Type must be SMB or NFS.")
+    host = str(n.get("host", "")).strip()
+    if not HOST_RE.match(host):
+        raise Fail("Enter the server's name or IP address (letters, numbers, dots, dashes).")
+    user = str(n.get("username", "")).strip() if t == "smb" else ""
+    if not USER_RE.match(user):
+        raise Fail("The username has characters that aren't allowed.")
+    return {"type": t, "host": host, "username": user}
+
+
+def parse_smb_shares(text):
+    """Disk shares from `smbclient -g -L`, without the hidden admin ones (names ending in $)."""
+    out = []
+    for line in text.splitlines():
+        parts = line.split("|")
+        if len(parts) >= 2 and parts[0] == "Disk" and parts[1] and not parts[1].endswith("$"):
+            out.append(parts[1])
+    return sorted(set(out), key=str.lower)
+
+
+def parse_nfs_exports(text):
+    out = []
+    for line in text.splitlines():
+        tok = line.split()
+        if tok and tok[0].startswith("/") and NFS_EXPORT_RE.match(tok[0]):
+            out.append(tok[0])
+    return sorted(set(out), key=str.lower)
+
+
+def cmd_list_shares(req):
+    n = clean_server(req.get("net"))
+    pw = clean_password(req.get("password"))
+    if n["type"] == "nfs":
+        rc, out = run(["showmount", "-e", "--no-headers", n["host"]], 25)
+        if rc == 127:
+            raise Fail("This box is missing NFS support. Re-run the installer.")
+        if rc != 0:
+            raise Fail(explain_mount_error(out))
+        return {"shares": parse_nfs_exports(out)}
+    cred = None
+    cmd = ["smbclient", "-g", "-L", "//" + n["host"]]
+    if n["username"]:
+        saved = req.get("saved_channel")
+        if pw is None and saved is not None:
+            saved_path = f"{CREDS}/ch{clean_id(saved)}"
+            if read_cred_user(saved_path) == n["username"]:
+                try:
+                    with open(saved_path) as f:
+                        for line in f:
+                            if line.startswith("password="):
+                                pw = line[len("password="):].rstrip("\n")
+                except OSError:
+                    pass
+        os.makedirs(RUNDIR, mode=0o700, exist_ok=True)
+        cred = RUNDIR + "/shares.cred"
+        write_cred(cred, n["username"], pw or "")
+        cmd += ["-A", cred]
+    else:
+        cmd.append("-N")
+    try:
+        rc, out = run(cmd, 30)
+    finally:
+        if cred:
+            try:
+                os.unlink(cred)
+            except OSError:
+                pass
+    if rc == 127:
+        raise Fail("This box is missing the tool for listing shares (smbclient). Re-run the installer, or type the share name instead.")
+    shares = parse_smb_shares(out)
+    if rc != 0 and not shares:
+        raise Fail(explain_mount_error(out))
+    return {"shares": shares}
+
+
 def cmd_browse_mount(req):
     net = clean_net(req.get("net"))
     pw = clean_password(req.get("password"))
@@ -562,6 +654,7 @@ def cmd_set_timezone(req):
 
 
 COMMANDS = {
+    "list-shares": cmd_list_shares,
     "browse-mount": cmd_browse_mount,
     "browse-umount": cmd_browse_umount,
     "apply-mounts": cmd_apply_mounts,

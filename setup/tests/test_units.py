@@ -468,5 +468,50 @@ class Storage(unittest.TestCase):
         self.assertIn("proc /proc proc defaults 0 0", text)
 
 
+class Shares(unittest.TestCase):
+    setUp = Helper.setUp
+
+    def test_parse(self):
+        h = self.h
+        smb = "Disk|media|Primary\nDisk|IPC$|x\nDisk|backups|\nIPC|IPC$|IPC Service\nPrinter|lp|\nDisk|Kids TV|\nreply: junk\n"
+        self.assertEqual(h.parse_smb_shares(smb), ["backups", "Kids TV", "media"])
+        self.assertEqual(h.parse_nfs_exports("/mnt/user/media 192.168.1.0/24\n/mnt/user/tv *\nnot-a-path x\n"),
+                         ["/mnt/user/media", "/mnt/user/tv"])
+
+    def test_list_shares_never_puts_the_password_on_the_command_line(self):
+        h = self.h
+        seen = {}
+
+        def fake(cmd, timeout=60, input=None):
+            self.calls.append(cmd)
+            if "-A" in cmd:
+                seen["cred"] = open(cmd[cmd.index("-A") + 1]).read()
+            return 0, "Disk|media|\nDisk|IPC$|\n"
+        h.run = fake
+        out = h.cmd_list_shares({"net": {"type": "smb", "host": "192.168.0.139", "username": "ryan"}, "password": "s3cret"})
+        self.assertEqual(out["shares"], ["media"])
+        self.assertNotIn("s3cret", " ".join(self.calls[0]))
+        self.assertIn("password=s3cret", seen["cred"])
+        self.assertFalse(os.path.exists(h.RUNDIR + "/shares.cred"))  # cleaned up
+        h.run = lambda cmd, timeout=60, input=None: (self.calls.append(cmd), (0, "Disk|pub|\n"))[1]
+        self.assertEqual(h.cmd_list_shares({"net": {"type": "smb", "host": "tower", "username": ""}})["shares"], ["pub"])
+        self.assertIn("-N", self.calls[-1])  # guest
+
+    def test_list_shares_errors_are_friendly_and_input_is_checked(self):
+        h = self.h
+        h.run = lambda cmd, timeout=60, input=None: (1, "session setup failed: NT_STATUS_LOGON_FAILURE")
+        with self.assertRaises(h.Fail) as cm:
+            h.cmd_list_shares({"net": {"type": "smb", "host": "tower", "username": "x"}, "password": "bad"})
+        self.assertIn("server said no", str(cm.exception))
+        h.run = lambda cmd, timeout=60, input=None: (127, "no such file")
+        with self.assertRaises(h.Fail) as cm:
+            h.cmd_list_shares({"net": {"type": "smb", "host": "tower", "username": ""}})
+        self.assertIn("smbclient", str(cm.exception))
+        for bad in ({"type": "smb", "host": "a b", "username": ""}, {"type": "smb", "host": "x;y", "username": ""},
+                    {"type": "sshfs", "host": "x", "username": ""}, {"type": "smb", "host": "x", "username": "a b"}):
+            with self.assertRaises(h.Fail, msg=str(bad)):
+                h.cmd_list_shares({"net": bad})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

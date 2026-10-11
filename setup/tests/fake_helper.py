@@ -25,6 +25,11 @@ if cmd == "browse-mount":
         touch(b + "/Kids TV/Dragon Tales/c.mkv")
         touch(b + "/Movies/d.mp4")
         touch(b + "/$RECYCLE.BIN/e.mp4")
+elif cmd == "list-shares":
+    if req["net"]["host"] == "badhost":
+        out = {"ok": False, "error": "Can't reach that server. Check it is on, on the same network, and the address is right."}
+    else:
+        out["shares"] = ["Kids TV", "Movies", "media"] if req["net"]["type"] == "smb" else ["/mnt/user/media"]
 elif cmd == "list-disks":
     out["disks"] = [{"path": "/dev/sda", "name": "WD Elements 25A2", "size": 2000000000000, "serial": "1", "labels": ["OLD"],
                      "filesystems": ["exfat"], "mounts": [], "partitions": ["/dev/sda1"], "is_storage": False}]
