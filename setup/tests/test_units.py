@@ -122,6 +122,19 @@ class Config(unittest.TestCase):
         self.assertEqual(c["name"], "Channel 4")
         self.assertEqual(c["path"], nb.mount_point(2) + "/Kids/Dragon Tales")
 
+    def test_audio_follows_real_hdmi_card(self):
+        # Real Pi output: only one HDMI card, named "vc4hdmi" (no 0/1).
+        f = os.path.join(TMP, "cards")
+        open(f, "w").write(" 0 [Headphones     ]: bcm2835_headpho - bcm2835 Headphones\n"
+                           " 1 [vc4hdmi        ]: vc4-hdmi - vc4-hdmi\n")
+        old, nb.ALSA_CARDS_FILE = nb.ALSA_CARDS_FILE, f
+        try:
+            for out in ("auto", "hdmi0", "hdmi1"):
+                self.s["sound"]["output"] = out
+                self.assertEqual(nb.build_config(self.s)["audio_device"], "alsa/hdmi:CARD=vc4hdmi,DEV=0")
+        finally:
+            nb.ALSA_CARDS_FILE = old
+
     def test_audio_offsets_and_yaml(self):
         self.s["sound"]["output"] = "hdmi1"
         self.s["playback"]["start_offset_min"] = self.s["playback"]["start_offset_max"] = 5

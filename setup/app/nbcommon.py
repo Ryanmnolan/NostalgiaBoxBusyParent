@@ -47,10 +47,7 @@ DEFAULT_USER = "admin"
 DEFAULT_PASSWORD = "nostalgia"
 SKIP_DIRS = {"$recycle.bin", "system volume information", "@eadir", "lost+found", "__macosx"}
 
-AUDIO_DEVICES = {
-    "hdmi0": "alsa/hdmi:CARD=vc4hdmi0,DEV=0",
-    "hdmi1": "alsa/hdmi:CARD=vc4hdmi1,DEV=0",
-}
+ALSA_CARDS_FILE = "/proc/asound/cards"
 
 
 # --------------------------------------------------------------- small utils
@@ -411,12 +408,33 @@ def has_video(path: str, max_seconds: float = 4.0) -> bool:
 
 
 # ---------------------------------------------------------- config for NostalgiaBox
+def _hdmi_cards() -> list[str]:
+    """ALSA card ids of the Pi's HDMI audio outputs (vc4hdmi, vc4hdmi0, vc4hdmi1...), sorted.
+    Newer Pi OS kernels name a single output "vc4hdmi" rather than "vc4hdmi0"."""
+    try:
+        text = open(ALSA_CARDS_FILE, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return []
+    return sorted(set(re.findall(r"\[(vc4hdmi\d?)\s*\]", text)))
+
+
 def _audio_device(s: dict) -> str | None:
     out = s["sound"]["output"]
-    if out in AUDIO_DEVICES:
-        return AUDIO_DEVICES[out]
     if out == "custom" and s["sound"]["custom_device"]:
         return s["sound"]["custom_device"]
+    cards = _hdmi_cards()
+    if out in ("hdmi0", "hdmi1"):
+        want = "vc4" + out
+        if want in cards:
+            card = want
+        elif cards:
+            card = cards[0]   # only one HDMI sound card exists, so use it
+        else:
+            card = want       # can't look; fall back to the usual name
+        return f"alsa/hdmi:CARD={card},DEV=0"
+    if out == "auto" and cards:
+        # This is a TV box: prefer HDMI over the headphone jack mpv might pick.
+        return f"alsa/hdmi:CARD={cards[0]},DEV=0"
     return None
 
 

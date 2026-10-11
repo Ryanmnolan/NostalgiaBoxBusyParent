@@ -179,6 +179,11 @@ try:
         check("default-password banner shown", True)
         check("no horizontal scroll at phone width", page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"))
         page.screenshot(path=f"{SHOTS}/02-home.png")
+        for w in (360, 390):
+            page.set_viewport_size({"width": w, "height": 844})
+            fits = page.evaluate("() => [...document.querySelectorAll('[data-nav]')].every(b => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && b.scrollWidth <= b.clientWidth + 1 })")
+            check(f"all 5 tabs fit on a {w}px phone", fits, str(page.evaluate("() => [...document.querySelectorAll('[data-nav]')].map(b => { const r = b.getBoundingClientRect(); return [b.textContent, Math.round(r.left), Math.round(r.right), b.scrollWidth, b.clientWidth, innerWidth] })")))
+        page.set_viewport_size({"width": 390, "height": 844})
         page.locator('[data-nav="storage"]').click()
         expect(page.locator("#drives .drive")).to_have_count(1)
         check("storage card lists the drive", "WD Elements" in page.locator("#drives").inner_text())
